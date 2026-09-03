@@ -25,6 +25,7 @@ import { bn } from './locales/bn';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { UniversalUploader } from './components/UniversalUploader';
+import { ConversionHistoryPanel } from './components/ConversionHistoryPanel';
 import { ImageResizerTool } from './components/ImageResizerTool';
 import { ImageCropTool } from './components/ImageCropTool';
 import { PdfToolsView } from './components/PdfToolsView';
@@ -34,6 +35,7 @@ import { ToolDirectoryView } from './components/ToolDirectoryView';
 import { AdminView } from './components/AdminView';
 import { SearchModal } from './components/SearchModal';
 import { AboutPage, PrivacyPage, TermsPage, FaqPage, ContactPage } from './components/StaticPages';
+import { DedicatedToolPage } from './components/DedicatedToolPage';
 import { TOOLS_LIST } from './data/tools';
 
 export default function App() {
@@ -102,7 +104,129 @@ export default function App() {
       return <ToolDirectoryView onSelectTool={navigateTo} />;
     }
 
-    if (currentRoute === '/tools/image-resizer') {
+    // DEDICATED CATEGORY HUBS (Navbar & Category links)
+    if (currentRoute === '/compress' || currentRoute === '/compression') {
+      return (
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+              Free Online File Compressor
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Compress PDF, video, audio, and image files to drastically reduce file size while maintaining excellent quality.
+            </p>
+          </div>
+          <UniversalUploader language={language} presetTargetFormat="compress" />
+          <div className="pt-6">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Dedicated Compression Tools</h2>
+            <ToolDirectoryView onSelectTool={navigateTo} initialCategory="compression" />
+          </div>
+        </div>
+      );
+    }
+
+    if (currentRoute === '/video') {
+      return (
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+              Free Online Video Tools & Converter
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Convert, compress, trim, and transcode video files in MP4, WebM, MOV, MKV, and AVI. 100% free with client-side WebAssembly.
+            </p>
+          </div>
+          <UniversalUploader language={language} presetCategory="video" />
+          <div className="pt-6">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Popular Video Tools</h2>
+            <ToolDirectoryView onSelectTool={navigateTo} initialCategory="video" />
+          </div>
+        </div>
+      );
+    }
+
+    if (currentRoute === '/audio') {
+      return (
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+              Free Online Audio Tools & Converter
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Convert audio between MP3, WAV, AAC, FLAC, OGG, and extract audio tracks from video files with custom bitrate and sample rates.
+            </p>
+          </div>
+          <UniversalUploader language={language} presetCategory="audio" />
+          <div className="pt-6">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Popular Audio Tools</h2>
+            <ToolDirectoryView onSelectTool={navigateTo} initialCategory="audio" />
+          </div>
+        </div>
+      );
+    }
+
+    if (currentRoute === '/image') {
+      return (
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+              Free Online Image Tools & Converter
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Convert JPG, PNG, WEBP, HEIC, resize, crop, and compress images with instantaneous client-side processing.
+            </p>
+          </div>
+          <UniversalUploader language={language} presetCategory="image" />
+          <div className="pt-6">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Popular Image Tools</h2>
+            <ToolDirectoryView onSelectTool={navigateTo} initialCategory="image" />
+          </div>
+        </div>
+      );
+    }
+
+    if (currentRoute === '/pdf') {
+      return (
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+              Free Online PDF Tools & Converter
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Merge, split, compress, rotate, and convert PDF documents directly inside your browser. No files uploaded to external servers.
+            </p>
+          </div>
+          <PdfToolsView initialTab="merge" />
+          <div className="pt-8">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">All PDF Converters</h2>
+            <ToolDirectoryView onSelectTool={navigateTo} initialCategory="pdf" />
+          </div>
+        </div>
+      );
+    }
+
+    if (currentRoute === '/documents') {
+      return (
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+              Free Online Document & E-Book Converter
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Convert Word (DOCX), Text (TXT), HTML, EPUB, MOBI, spreadsheets (CSV, XLSX), and archive formats securely in-browser.
+            </p>
+          </div>
+          <UniversalUploader language={language} presetCategory="document" />
+          <div className="pt-6">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Document Tools & Formats</h2>
+            <ToolDirectoryView onSelectTool={navigateTo} initialCategory="document" />
+          </div>
+        </div>
+      );
+    }
+
+    // INDIVIDUAL SPECIALTY TOOLS
+    if (currentRoute === '/image-resizer' || currentRoute === '/tools/image-resizer') {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <div className="text-center max-w-xl mx-auto space-y-2">
@@ -116,7 +240,7 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/tools/image-crop') {
+    if (currentRoute === '/image-crop' || currentRoute === '/tools/image-crop') {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <div className="text-center max-w-xl mx-auto space-y-2">
@@ -130,7 +254,11 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/tools/merge-pdf') {
+    if (
+      currentRoute === '/merge-pdf' ||
+      currentRoute === '/pdf/merge' ||
+      currentRoute === '/tools/merge-pdf'
+    ) {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <PdfToolsView initialTab="merge" />
@@ -138,7 +266,11 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/tools/split-pdf') {
+    if (
+      currentRoute === '/split-pdf' ||
+      currentRoute === '/pdf/split' ||
+      currentRoute === '/tools/split-pdf'
+    ) {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <PdfToolsView initialTab="split" />
@@ -146,7 +278,12 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/tools/compress-pdf') {
+    if (
+      currentRoute === '/compress-pdf' ||
+      currentRoute === '/pdf/compress' ||
+      currentRoute === '/tools/compress-pdf' ||
+      currentRoute === '/pdf-compressor'
+    ) {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <PdfToolsView initialTab="compress" />
@@ -154,7 +291,11 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/tools/rotate-pdf') {
+    if (
+      currentRoute === '/rotate-pdf' ||
+      currentRoute === '/pdf/rotate' ||
+      currentRoute === '/tools/rotate-pdf'
+    ) {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <PdfToolsView initialTab="rotate" />
@@ -162,7 +303,7 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/tools/unit-converter') {
+    if (currentRoute === '/units' || currentRoute === '/tools/unit-converter') {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <UnitConverterView />
@@ -170,7 +311,7 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/tools/timezone-converter') {
+    if (currentRoute === '/time' || currentRoute === '/tools/timezone-converter') {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <TimeZoneConverterView />
@@ -178,10 +319,25 @@ export default function App() {
       );
     }
 
-    // Check if it's a specific format preset route, e.g. /tools/mp4-to-mp3
-    const formatToolMatch = TOOLS_LIST.find((t) => t.route === currentRoute);
-    let presetTarget = formatToolMatch?.defaultTarget;
-    let presetCat = formatToolMatch?.category;
+    // Match dedicated format tool route, e.g. /heic-to-jpg, /image/heic-to-jpg, /mp4-to-mp3, etc.
+    const normalizedPath = currentRoute.replace(/^\/(image|video|audio|pdf|documents|compress|tools)/, '');
+    const formatToolMatch = TOOLS_LIST.find(
+      (t) =>
+        t.route === currentRoute ||
+        `/tools${t.route}` === currentRoute ||
+        (normalizedPath && t.route === normalizedPath) ||
+        (normalizedPath && t.route === `/${normalizedPath.replace(/^\//, '')}`)
+    );
+
+    if (formatToolMatch && currentRoute !== '/') {
+      return (
+        <DedicatedToolPage
+          tool={formatToolMatch}
+          language={language}
+          onNavigate={navigateTo}
+        />
+      );
+    }
 
     // DEFAULT HOME / UNIVERSAL CONVERTER VIEW
     return (
@@ -229,9 +385,12 @@ export default function App() {
         <div className="max-w-4xl mx-auto">
           <UniversalUploader
             language={language}
-            presetTargetFormat={presetTarget}
-            presetCategory={presetCat}
           />
+        </div>
+
+        {/* RECENT CONVERSIONS & LIVE FILE SIZE STATS */}
+        <div className="max-w-4xl mx-auto">
+          <ConversionHistoryPanel language={language} />
         </div>
 
         {/* QUICK FEATURE TILES */}

@@ -13,7 +13,11 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Cpu,
 } from 'lucide-react';
+import { PDFDocument, degrees } from 'pdf-lib';
+import JSZip from 'jszip';
+import { saveHistoryRecord } from '../utils/historyStorage';
 
 type PdfTab = 'merge' | 'split' | 'compress' | 'rotate';
 
@@ -79,8 +83,46 @@ export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = '
     setIsMerging(true);
     setMergeError(null);
 
+    // 1. Client-Side in-browser merge with pdf-lib (Zero-cost)
     try {
-      // 1. Upload files
+      const mergedPdf = await PDFDocument.create();
+      let totalInputSize = 0;
+      for (const file of mergeFiles) {
+        totalInputSize += file.size;
+        const arrayBuffer = await file.arrayBuffer();
+        const doc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+        const copiedPages = await mergedPdf.copyPages(doc, doc.getPageIndices());
+        copiedPages.forEach((p) => mergedPdf.addPage(p));
+      }
+
+      const mergedBytes = await mergedPdf.save();
+      const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      setMergeDownloadUrl(url);
+      setIsMerging(false);
+
+      saveHistoryRecord({
+        id: `merge-${Date.now()}`,
+        originalName: `${mergeFiles.length} PDF Documents`,
+        outputFilename: 'merged_document.pdf',
+        fromFormat: 'pdf',
+        toFormat: 'pdf',
+        originalSize: totalInputSize,
+        outputSize: blob.size,
+        savedBytes: Math.max(0, totalInputSize - blob.size),
+        savedPercent: totalInputSize > blob.size ? Math.round(((totalInputSize - blob.size) / totalInputSize) * 100) : 0,
+        timestamp: Date.now(),
+        downloadUrl: url,
+        mode: 'wasm',
+        category: 'document',
+      });
+      return;
+    } catch (clientErr) {
+      console.warn('Client merge failed, falling back to server:', clientErr);
+    }
+
+    try {
+      // 2. Server fallback
       const fd = new FormData();
       mergeFiles.forEach((f) => fd.append('files', f));
 
@@ -91,7 +133,6 @@ export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = '
       const primaryFile = upData.files[0];
       const additionalPaths = upData.files.slice(1).map((f: any) => f.fileId);
 
-      // 2. Submit merge job
       const jobRes = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -120,11 +161,52 @@ export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = '
     }
   };
 
-  // SPLIT HANDLER
+  // SPLIT HANDLER (In-browser with pdf-lib / JSZip)
   const handleSplitSubmit = async () => {
     if (!splitFile) return;
     setIsSplitting(true);
     setSplitError(null);
+
+    try {
+      const arrayBuffer = await splitFile.arrayBuffer();
+      const doc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+      const totalPages = doc.getPageCount();
+
+      if (splitAll || totalPages > 1) {
+        const zip = new JSZip();
+        for (let i = 0; i < totalPages; i++) {
+          const singleDoc = await PDFDocument.create();
+          const [page] = await singleDoc.copyPages(doc, [i]);
+          singleDoc.addPage(page);
+          const bytes = await singleDoc.save();
+          zip.file(`page_${i + 1}.pdf`, bytes);
+        }
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(zipBlob);
+        setSplitDownloadUrl(url);
+        setIsSplitting(false);
+
+        saveHistoryRecord({
+          id: `split-${Date.now()}`,
+          originalName: splitFile.name,
+          outputFilename: `${splitFile.name.replace(/\.pdf$/i, '')}_split_pages.zip`,
+          fromFormat: 'pdf',
+          toFormat: 'zip',
+          originalSize: splitFile.size,
+          outputSize: zipBlob.size,
+          savedBytes: 0,
+          savedPercent: 0,
+          timestamp: Date.now(),
+          downloadUrl: url,
+          mode: 'wasm',
+          category: 'document',
+        });
+        return;
+      }
+    } catch (clientErr) {
+      console.warn('Client split failed, falling back to server:', clientErr);
+    }
 
     try {
       const fd = new FormData();
@@ -164,11 +246,48 @@ export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = '
     }
   };
 
-  // COMPRESS HANDLER
+  // COMPRESS HANDLER (In-browser with pdf-lib)
   const handleCompressSubmit = async () => {
     if (!compressFile) return;
     setIsCompressing(true);
     setCompressError(null);
+
+    try {
+      const arrayBuffer = await compressFile.arrayBuffer();
+      const doc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+      const compressedBytes = await doc.save({
+        useObjectStreams: true,
+        addDefaultPage: false,
+      });
+
+      const blob = new Blob([compressedBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      setCompressDownloadUrl(url);
+      setCompressStats({ orig: compressFile.size, comp: blob.size });
+      setIsCompressing(false);
+
+      const savedBytes = Math.max(0, compressFile.size - blob.size);
+      const savedPercent = compressFile.size > blob.size ? Math.round((savedBytes / compressFile.size) * 100) : 0;
+
+      saveHistoryRecord({
+        id: `comp-${Date.now()}`,
+        originalName: compressFile.name,
+        outputFilename: `compressed_${compressFile.name}`,
+        fromFormat: 'pdf',
+        toFormat: 'pdf',
+        originalSize: compressFile.size,
+        outputSize: blob.size,
+        savedBytes,
+        savedPercent,
+        timestamp: Date.now(),
+        downloadUrl: url,
+        mode: 'wasm',
+        category: 'document',
+      });
+      return;
+    } catch (clientErr) {
+      console.warn('Client compress failed, falling back to server:', clientErr);
+    }
 
     try {
       const fd = new FormData();
@@ -216,11 +335,46 @@ export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = '
     }
   };
 
-  // ROTATE HANDLER
+  // ROTATE HANDLER (In-browser with pdf-lib)
   const handleRotateSubmit = async () => {
     if (!rotateFile) return;
     setIsRotating(true);
     setRotateError(null);
+
+    try {
+      const arrayBuffer = await rotateFile.arrayBuffer();
+      const doc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+      const pages = doc.getPages();
+      pages.forEach((p) => {
+        const curr = p.getRotation().angle;
+        p.setRotation(degrees((curr + rotateDeg) % 360));
+      });
+
+      const rotatedBytes = await doc.save();
+      const blob = new Blob([rotatedBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      setRotateDownloadUrl(url);
+      setIsRotating(false);
+
+      saveHistoryRecord({
+        id: `rot-${Date.now()}`,
+        originalName: rotateFile.name,
+        outputFilename: `rotated_${rotateFile.name}`,
+        fromFormat: 'pdf',
+        toFormat: 'pdf',
+        originalSize: rotateFile.size,
+        outputSize: blob.size,
+        savedBytes: 0,
+        savedPercent: 0,
+        timestamp: Date.now(),
+        downloadUrl: url,
+        mode: 'wasm',
+        category: 'document',
+      });
+      return;
+    } catch (clientErr) {
+      console.warn('Client rotate failed, falling back to server:', clientErr);
+    }
 
     try {
       const fd = new FormData();

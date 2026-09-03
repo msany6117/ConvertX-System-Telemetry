@@ -22,10 +22,13 @@ export const ConversionSettingsModal: React.FC<ConversionSettingsModalProps> = (
     onClose();
   };
 
-  const isImage = item.category === 'image';
+  const ext = item.extension.toLowerCase();
+  const isImage = item.category === 'image' || ['heic', 'heif', 'jpg', 'jpeg', 'png', 'webp', 'avif'].includes(ext);
   const isVideo = item.category === 'video';
   const isAudio = item.category === 'audio';
-  const isPdf = item.category === 'pdf';
+  const isPdf = item.category === 'pdf' || item.targetFormat === 'pdf';
+  const isEbook = ['epub', 'mobi'].includes(ext) || ['epub', 'mobi'].includes(item.targetFormat);
+  const isArchive = item.category === 'archive' || ['zip', 'rar', '7z', 'tar'].includes(ext);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in duration-150">
@@ -212,6 +215,70 @@ export const ConversionSettingsModal: React.FC<ConversionSettingsModalProps> = (
                 </div>
               </div>
 
+              {/* Video Bitrate and Codec fine-tuning */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Video Bitrate
+                  </label>
+                  <select
+                    value={options.videoBitrate || 'auto'}
+                    onChange={(e) => setOptions({ ...options, videoBitrate: e.target.value })}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    <option value="auto">Auto (Balanced quality)</option>
+                    <option value="1000k">1.0 Mbps (Low / Fast)</option>
+                    <option value="2500k">2.5 Mbps (Standard 720p)</option>
+                    <option value="5000k">5.0 Mbps (High 1080p)</option>
+                    <option value="10000k">10 Mbps (Ultra HD)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Video Codec
+                  </label>
+                  <select
+                    value={options.videoCodec || 'auto'}
+                    onChange={(e) => setOptions({ ...options, videoCodec: e.target.value })}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    <option value="auto">Auto (Best compatible)</option>
+                    <option value="libx264">H.264 / AVC (Universal)</option>
+                    <option value="libvpx">VP8 / VP9 (WebM)</option>
+                    <option value="libx265">H.265 / HEVC (High Efficiency)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Video Metadata Fine-Tuning */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-800/40 space-y-2.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Video Metadata Tags
+                </span>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. My Travel Vlog"
+                      value={options.metaTitle || ''}
+                      onChange={(e) => setOptions({ ...options, metaTitle: e.target.value })}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">Artist / Creator</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Studio Name"
+                      value={options.metaArtist || ''}
+                      onChange={(e) => setOptions({ ...options, metaArtist: e.target.value })}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
@@ -302,6 +369,121 @@ export const ConversionSettingsModal: React.FC<ConversionSettingsModalProps> = (
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
                 </div>
+              </div>
+
+              {/* Audio Metadata Fine-Tuning */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-800/40 space-y-2.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Audio Metadata Tags
+                </span>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">Song / Track Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Song Title"
+                      value={options.metaTitle || ''}
+                      onChange={(e) => setOptions({ ...options, metaTitle: e.target.value })}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">Artist / Performer</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Artist Name"
+                      value={options.metaArtist || ''}
+                      onChange={(e) => setOptions({ ...options, metaArtist: e.target.value })}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* E-BOOK SETTINGS */}
+          {isEbook && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Base Font Size (pt)
+                  </label>
+                  <select
+                    value={options.fontSize || 10}
+                    onChange={(e) => setOptions({ ...options, fontSize: parseInt(e.target.value, 10) })}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    <option value={9}>9 pt (Compact)</option>
+                    <option value={10}>10 pt (Standard Novel)</option>
+                    <option value={12}>12 pt (Large / Readable)</option>
+                    <option value={14}>14 pt (Large Print)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Target Page Layout
+                  </label>
+                  <select
+                    value={options.pageLayout || 'a4'}
+                    onChange={(e) => setOptions({ ...options, pageLayout: e.target.value })}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    <option value="a4">A4 Standard</option>
+                    <option value="letter">US Letter</option>
+                    <option value="kindle">Kindle / E-Reader (6-inch)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-800/40 space-y-2.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Book Metadata
+                </span>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">Book Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Pride and Prejudice"
+                      value={options.metaTitle || ''}
+                      onChange={(e) => setOptions({ ...options, metaTitle: e.target.value })}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-1">Author Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Jane Austen"
+                      value={options.metaArtist || ''}
+                      onChange={(e) => setOptions({ ...options, metaArtist: e.target.value })}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ARCHIVE SETTINGS */}
+          {isArchive && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Compression Level
+                </label>
+                <select
+                  value={options.compressionLevel || 6}
+                  onChange={(e) => setOptions({ ...options, compressionLevel: parseInt(e.target.value, 10) })}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                >
+                  <option value={1}>Level 1 - Fastest (Lowest compression)</option>
+                  <option value={3}>Level 3 - Fast</option>
+                  <option value={6}>Level 6 - Normal (Balanced default)</option>
+                  <option value={9}>Level 9 - Ultra (Maximum compression)</option>
+                </select>
               </div>
             </>
           )}

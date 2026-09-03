@@ -14,11 +14,20 @@ import {
   RefreshCw,
   Plus,
   Sparkles,
+  Cpu,
+  Server,
+  ShieldCheck,
+  ChevronDown,
+  Cloud,
 } from 'lucide-react';
 import { UploadedFileItem, Language } from '../types';
 import { en } from '../locales/en';
 import { bn } from '../locales/bn';
 import { ConversionSettingsModal } from './ConversionSettingsModal';
+import { CloudImportModal, CloudSource } from './CloudImportModal';
+import { canConvertClientSide, convertClientSide } from '../utils/clientEngine';
+import { saveHistoryRecord } from '../utils/historyStorage';
+import JSZip from 'jszip';
 
 interface UniversalUploaderProps {
   language: Language;
@@ -37,6 +46,9 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
   const [items, setItems] = useState<UploadedFileItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
+  const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
+  const [cloudSource, setCloudSource] = useState<CloudSource>('gdrive');
+  const [isCloudDropdownOpen, setIsCloudDropdownOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState('');
@@ -44,17 +56,24 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
   const [isConvertingAll, setIsConvertingAll] = useState(false);
   const [batchTarget, setBatchTarget] = useState<string>('');
   const [registry, setRegistry] = useState<Record<string, any>>({});
+  const [engineMode, setEngineMode] = useState<'auto' | 'wasm' | 'server'>('auto');
 
   // Fetch registry formats on mount
   useEffect(() => {
     fetch('/api/registry')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error('Registry endpoint unavailable');
+        return res.json();
+      })
       .then((data) => {
         if (data.formats) {
           setRegistry(data.formats);
         }
       })
-      .catch((e) => console.warn('Could not fetch server registry:', e));
+      .catch((e) => {
+        // Safe in standalone / zero-backend mode
+        console.log('Running in zero-backend / client mode (Server registry skipped):', e.message || e);
+      });
   }, []);
 
   // Format bytes helper
@@ -239,11 +258,100 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
 
-    // 1. Upload if not already uploaded
+    // Check if item can be converted client-side with WASM/Canvas/JS
+    const isClientCapable = !!item.file && canConvertClientSide(item.extension, item.targetFormat);
+    const preferClient = engineMode === 'wasm' || (engineMode === 'auto' && isClientCapable);
+
+    // 1. CLIENT-SIDE WASM / BROWSER CONVERSION
+    if (preferClient && item.file) {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === itemId
+            ? { ...i, status: 'processing', progress: 15, engineMode: 'wasm' }
+            : i
+        )
+      );
+
+      try {
+        const result = await convertClientSide(
+          item.file,
+          item.targetFormat,
+          item.options,
+          (prog) => {
+            setItems((prev) =>
+              prev.map((i) => (i.id === itemId ? { ...i, progress: prog } : i))
+            );
+          }
+        );
+
+        const downloadUrl = URL.createObjectURL(result.blob);
+        const outputSize = result.outputSize;
+        const savedPercent =
+          item.size > outputSize
+            ? Math.round(((item.size - outputSize) / item.size) * 100)
+            : 0;
+
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === itemId
+              ? {
+                  ...i,
+                  status: 'completed',
+                  progress: 100,
+                  outputFilename: result.outputFilename,
+                  outputSize,
+                  savedPercent,
+                  downloadUrl,
+                  outputBlob: result.blob,
+                  engineMode: 'wasm',
+                }
+              : i
+          )
+        );
+
+        // Record in LocalStorage History
+        saveHistoryRecord({
+          id: item.id,
+          originalName: item.originalName,
+          outputFilename: result.outputFilename,
+          fromFormat: item.extension,
+          toFormat: item.targetFormat,
+          originalSize: item.size,
+          outputSize,
+          savedBytes: Math.max(0, item.size - outputSize),
+          savedPercent,
+          timestamp: Date.now(),
+          downloadUrl,
+          mode: 'wasm',
+          category: item.category,
+        });
+
+        return;
+      } catch (wasmErr: any) {
+        console.warn('WASM client conversion encountered an issue:', wasmErr);
+        if (engineMode === 'wasm') {
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === itemId
+                ? {
+                    ...i,
+                    status: 'failed',
+                    errorMessage: wasmErr.message || 'WASM conversion failed.',
+                  }
+                : i
+            )
+          );
+          return;
+        }
+        // If in 'auto' mode, fall through to server fallback
+      }
+    }
+
+    // 2. SERVER FALLBACK CONVERSION
     let currentFileId = item.fileId;
 
     setItems((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, status: 'uploading', progress: 20 } : i))
+      prev.map((i) => (i.id === itemId ? { ...i, status: 'uploading', progress: 20, engineMode: 'server' } : i))
     );
 
     try {
@@ -268,7 +376,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         throw new Error('No uploaded file reference found.');
       }
 
-      // 2. Submit conversion job
+      // Submit conversion job
       setItems((prev) =>
         prev.map((i) =>
           i.id === itemId
@@ -298,8 +406,8 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
 
       const jobId = jobData.jobs[0].jobId;
 
-      // 3. Poll for completion
-      pollJobStatus(itemId, jobId);
+      // Poll for completion
+      pollJobStatus(itemId, jobId, item);
     } catch (err: any) {
       setItems((prev) =>
         prev.map((i) =>
@@ -315,8 +423,8 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
     }
   };
 
-  // Polling helper
-  const pollJobStatus = (itemId: string, jobId: string) => {
+  // Polling helper for server jobs
+  const pollJobStatus = (itemId: string, jobId: string, originalItem: UploadedFileItem) => {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/jobs/${jobId}`);
@@ -329,6 +437,10 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
 
         if (data.status === 'COMPLETED') {
           clearInterval(interval);
+          const outSize = data.outputSize || originalItem.size;
+          const savedPct = data.savedPercent || 0;
+          const outName = data.outputFilename || `${originalItem.originalName}.${originalItem.targetFormat}`;
+
           setItems((prev) =>
             prev.map((i) =>
               i.id === itemId
@@ -337,14 +449,32 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                     jobId,
                     status: 'completed',
                     progress: 100,
-                    outputFilename: data.outputFilename,
-                    outputSize: data.outputSize,
-                    savedPercent: data.savedPercent,
+                    outputFilename: outName,
+                    outputSize: outSize,
+                    savedPercent: savedPct,
                     downloadUrl: data.downloadUrl,
+                    engineMode: 'server',
                   }
                 : i
             )
           );
+
+          // Save to LocalStorage History
+          saveHistoryRecord({
+            id: originalItem.id,
+            originalName: originalItem.originalName,
+            outputFilename: outName,
+            fromFormat: originalItem.extension,
+            toFormat: originalItem.targetFormat,
+            originalSize: originalItem.size,
+            outputSize: outSize,
+            savedBytes: Math.max(0, originalItem.size - outSize),
+            savedPercent: savedPct,
+            timestamp: Date.now(),
+            downloadUrl: data.downloadUrl,
+            mode: 'server',
+            category: originalItem.category,
+          });
         } else if (data.status === 'FAILED') {
           clearInterval(interval);
           setItems((prev) =>
@@ -389,10 +519,45 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
     setIsConvertingAll(false);
   };
 
-  // Download All as ZIP
+  // Download All as ZIP (Zero-Cost In-Browser JSZip or Server Fallback)
   const handleDownloadAllZip = async () => {
-    const completedJobIds = items
-      .filter((i) => i.status === 'completed' && i.jobId)
+    const completedItems = items.filter((i) => i.status === 'completed');
+    if (completedItems.length === 0) return;
+
+    // Check if items have client blobs or can be zipped in browser
+    const hasClientBlobs = completedItems.some((i) => !!i.outputBlob);
+    if (hasClientBlobs || completedItems.every((i) => !!i.downloadUrl)) {
+      try {
+        const zip = new JSZip();
+        for (const item of completedItems) {
+          const fname = item.outputFilename || `${item.originalName}.${item.targetFormat}`;
+          if (item.outputBlob) {
+            zip.file(fname, item.outputBlob);
+          } else if (item.downloadUrl) {
+            const resp = await fetch(item.downloadUrl);
+            const blob = await resp.blob();
+            zip.file(fname, blob);
+          }
+        }
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const url = window.URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ConvertX_Batch_Export.zip';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        return;
+      } catch (err) {
+        console.warn('In-browser ZIP packaging failed, falling back to server:', err);
+      }
+    }
+
+    // Fallback: Server-side ZIP endpoint
+    const completedJobIds = completedItems
+      .filter((i) => !!i.jobId)
       .map((i) => i.jobId as string);
 
     if (completedJobIds.length === 0) return;
@@ -470,24 +635,132 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
             {t.hero.dropSubtitle}
           </p>
 
-          {/* Action buttons: Device & URL */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          {/* Action buttons: Device & Cloud Providers */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+            {/* Primary split button */}
+            <div className="relative inline-flex rounded-xl shadow-md shadow-blue-500/25">
+              <button
+                id="choose-files-btn"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 rounded-l-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-all cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>{t.hero.fromDevice}</span>
+              </button>
+              <button
+                id="choose-files-dropdown-btn"
+                onClick={() => setIsCloudDropdownOpen(!isCloudDropdownOpen)}
+                className="flex items-center justify-center rounded-r-xl border-l border-blue-500 bg-blue-600 px-3 py-3 text-white hover:bg-blue-700 transition-all cursor-pointer"
+                title="Cloud storage options"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isCloudDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Cloud Dropdown Menu */}
+              {isCloudDropdownOpen && (
+                <div
+                  className="absolute left-0 top-full mt-2 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-800 dark:bg-slate-900 text-left animate-in fade-in zoom-in-95 duration-100"
+                  onClick={() => setIsCloudDropdownOpen(false)}
+                >
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    <span>💻</span>
+                    <span>From Device</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCloudSource('gdrive');
+                      setIsCloudModalOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    <span>📁</span>
+                    <span>From Google Drive</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCloudSource('dropbox');
+                      setIsCloudModalOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    <span>📦</span>
+                    <span>From Dropbox</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCloudSource('onedrive');
+                      setIsCloudModalOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    <span>☁️</span>
+                    <span>From OneDrive</span>
+                  </button>
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                  <button
+                    onClick={() => {
+                      setCloudSource('url');
+                      setIsCloudModalOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    <LinkIcon className="h-3.5 w-3.5 text-slate-400" />
+                    <span>By Web URL</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Direct Cloud Buttons */}
             <button
-              id="choose-files-btn"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-blue-500/25 hover:bg-blue-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all cursor-pointer"
+              id="from-gdrive-btn"
+              onClick={() => {
+                setCloudSource('gdrive');
+                setIsCloudModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
             >
-              <Plus className="h-4 w-4" />
-              <span>{t.hero.fromDevice}</span>
+              <span>📁</span>
+              <span className="hidden sm:inline">Google Drive</span>
+            </button>
+
+            <button
+              id="from-dropbox-btn"
+              onClick={() => {
+                setCloudSource('dropbox');
+                setIsCloudModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
+            >
+              <span>📦</span>
+              <span className="hidden sm:inline">Dropbox</span>
+            </button>
+
+            <button
+              id="from-onedrive-btn"
+              onClick={() => {
+                setCloudSource('onedrive');
+                setIsCloudModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
+            >
+              <span>☁️</span>
+              <span className="hidden sm:inline">OneDrive</span>
             </button>
 
             <button
               id="from-url-btn"
-              onClick={() => setIsUrlModalOpen(true)}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
+              onClick={() => {
+                setCloudSource('url');
+                setIsCloudModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
             >
-              <LinkIcon className="h-4 w-4 text-slate-400" />
-              <span>{t.hero.fromUrl}</span>
+              <LinkIcon className="h-3.5 w-3.5 text-slate-400" />
+              <span>URL</span>
             </button>
           </div>
 
@@ -529,8 +802,23 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                   <option value="png">PNG (Image)</option>
                   <option value="pdf">PDF (Document)</option>
                   <option value="mp3">MP3 (Audio)</option>
-                  <option value="mp4">MP4 (Video)</option>
+                  <option value="wav">WAV (Audio)</option>
                   <option value="gif">GIF (Animation)</option>
+                </select>
+              </div>
+
+              {/* Engine mode switcher */}
+              <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 dark:border-slate-700 dark:bg-slate-800">
+                <Cpu className="h-3.5 w-3.5 text-blue-500" />
+                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Engine:</span>
+                <select
+                  value={engineMode}
+                  onChange={(e) => setEngineMode(e.target.value as any)}
+                  className="bg-transparent text-[11px] font-bold text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer"
+                >
+                  <option value="auto">⚡ Auto (WASM First)</option>
+                  <option value="wasm">⚡ WASM In-Browser Only</option>
+                  <option value="server">🖥️ Cloud Server (Fallback)</option>
                 </select>
               </div>
             </div>
@@ -644,6 +932,19 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                                 </span>
                               )}
                             </>
+                          )}
+
+                          {/* WASM vs Server Badge */}
+                          {item.engineMode === 'wasm' || (!item.engineMode && canConvertClientSide(item.extension, item.targetFormat)) ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.2 text-[10px] font-bold text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/50">
+                              <Cpu className="h-2.5 w-2.5" />
+                              {isCompleted ? 'WASM Local' : 'WASM In-Browser'}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 text-[10px] font-medium text-slate-500">
+                              <Server className="h-2.5 w-2.5" />
+                              Server Mode
+                            </span>
                           )}
                         </div>
                       </div>
@@ -771,52 +1072,15 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         </div>
       )}
 
-      {/* FROM URL MODAL */}
-      {isUrlModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Import File from URL</h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Provide a direct downloadable link (HTTP/HTTPS only).
-            </p>
-
-            <form onSubmit={handleUrlSubmit} className="mt-4 space-y-4">
-              <div>
-                <input
-                  type="url"
-                  placeholder="https://example.com/document.pdf"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                />
-              </div>
-
-              {urlError && (
-                <p className="text-xs text-rose-600 dark:text-rose-400">{urlError}</p>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsUrlModalOpen(false)}
-                  className="rounded-lg px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={urlLoading}
-                  className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {urlLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  <span>Import File</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* CLOUD & URL IMPORT MODAL */}
+      <CloudImportModal
+        isOpen={isCloudModalOpen}
+        initialSource={cloudSource}
+        onClose={() => setIsCloudModalOpen(false)}
+        onFileImported={(importedFile) => {
+          handleAddFiles([importedFile]);
+        }}
+      />
 
       {/* Advanced Settings Modal */}
       {activeSettingsItem && (

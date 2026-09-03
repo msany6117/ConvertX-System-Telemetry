@@ -5,11 +5,19 @@ import { FileCategory } from '../types';
 
 interface ToolDirectoryViewProps {
   onSelectTool: (route: string) => void;
+  initialCategory?: string;
 }
 
-export const ToolDirectoryView: React.FC<ToolDirectoryViewProps> = ({ onSelectTool }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+export const ToolDirectoryView: React.FC<ToolDirectoryViewProps> = ({ onSelectTool, initialCategory }) => {
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || 'all');
   const [filterQuery, setFilterQuery] = useState<string>('');
+
+  // Keep in sync if initialCategory changes
+  React.useEffect(() => {
+    if (initialCategory) {
+      setSelectedCategory(initialCategory);
+    }
+  }, [initialCategory]);
 
   const categories = [
     { id: 'all', label: 'All Tools', icon: Grid },
@@ -17,7 +25,8 @@ export const ToolDirectoryView: React.FC<ToolDirectoryViewProps> = ({ onSelectTo
     { id: 'video', label: 'Video Tools', icon: Video },
     { id: 'audio', label: 'Audio Tools', icon: Music },
     { id: 'pdf', label: 'PDF Tools', icon: FileText },
-    { id: 'compression', label: 'Compression', icon: Minimize2 },
+    { id: 'document', label: 'Document & E-Book Tools', icon: FileText },
+    { id: 'compression', label: 'Compression Tools', icon: Minimize2 },
     { id: 'utility', label: 'Converters & Utilities', icon: Scale },
   ];
 

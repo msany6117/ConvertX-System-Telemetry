@@ -21,6 +21,8 @@ export interface UploadedFileItem {
   outputSize?: number;
   savedPercent?: number;
   downloadUrl?: string;
+  outputBlob?: Blob;
+  engineMode?: 'wasm' | 'server';
   errorMessage?: string;
 }
 
