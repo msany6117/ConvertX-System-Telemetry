@@ -1,0 +1,6 @@
+{
+  "name": "ConvertX",
+  "description": "Convert, Compress & Edit Files — Free online file conversion platform for video, audio, image, PDF, documents, archives, and units.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

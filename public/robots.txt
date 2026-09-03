@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://convertx.app/sitemap.xml
