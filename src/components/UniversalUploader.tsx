@@ -620,19 +620,23 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative overflow-hidden rounded-3xl border-2 border-dashed p-8 md:p-12 text-center transition-all ${
+        className={`group relative overflow-hidden rounded-3xl border-2 border-dashed p-8 md:p-12 text-center transition-all duration-300 backdrop-blur-md ${
           isDragging
-            ? 'border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 scale-[1.01]'
-            : 'border-slate-300 bg-white/80 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/80 shadow-sm'
+            ? 'border-indigo-500 bg-gradient-to-br from-indigo-500/10 via-purple-500/15 to-pink-500/10 scale-[1.015] shadow-2xl shadow-indigo-500/20 ring-4 ring-indigo-500/20 animate-pulse'
+            : 'border-slate-300/80 bg-white/75 hover:border-indigo-400/90 hover:bg-slate-50/90 hover:shadow-xl hover:shadow-indigo-500/5 dark:border-slate-700/80 dark:bg-slate-900/60 dark:hover:border-indigo-500/60 shadow-sm'
         }`}
       >
-        <div className="mx-auto flex max-w-xl flex-col items-center">
+        {/* Ambient background glow accents */}
+        <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-gradient-to-br from-indigo-500/10 to-purple-500/0 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-gradient-to-tr from-pink-500/10 to-indigo-500/0 blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 mx-auto flex max-w-xl flex-col items-center">
           {/* Cloud Icon */}
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 shadow-inner">
-            <UploadCloud className="h-8 w-8 transition-transform group-hover:scale-110" />
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-500/15 via-purple-500/15 to-pink-500/15 text-indigo-600 dark:text-indigo-400 shadow-inner ring-1 ring-indigo-500/20 transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1">
+            <UploadCloud className="h-8 w-8 transition-transform duration-300 group-hover:scale-105" />
           </div>
 
-          <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h3 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
             {t.hero.dropTitle}
           </h3>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -642,11 +646,11 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
           {/* Action buttons: Device & Cloud Providers */}
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
             {/* Primary split button */}
-            <div className="relative inline-flex rounded-xl shadow-md shadow-blue-500/25">
+            <div className="relative inline-flex rounded-xl shadow-lg shadow-indigo-500/25 transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]">
               <button
                 id="choose-files-btn"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 rounded-l-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-all cursor-pointer"
+                className="flex items-center gap-2 rounded-l-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-6 py-3 text-sm font-bold text-white transition-all cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 <span>{t.hero.fromDevice}</span>
@@ -654,7 +658,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
               <button
                 id="choose-files-dropdown-btn"
                 onClick={() => setIsCloudDropdownOpen(!isCloudDropdownOpen)}
-                className="flex items-center justify-center rounded-r-xl border-l border-blue-500 bg-blue-600 px-3 py-3 text-white hover:bg-blue-700 transition-all cursor-pointer"
+                className="flex items-center justify-center rounded-r-xl border-l border-indigo-400/40 bg-purple-600 hover:bg-purple-700 px-3 py-3 text-white transition-all cursor-pointer"
                 title="Cloud storage options"
               >
                 <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isCloudDropdownOpen ? 'rotate-180' : ''}`} />
@@ -663,12 +667,12 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
               {/* Cloud Dropdown Menu */}
               {isCloudDropdownOpen && (
                 <div
-                  className="absolute left-0 top-full mt-2 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-800 dark:bg-slate-900 text-left animate-in fade-in zoom-in-95 duration-100"
+                  className="absolute left-0 top-full mt-2 z-30 w-56 rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-xl p-1.5 shadow-2xl dark:border-slate-800/90 dark:bg-slate-900/95 text-left animate-in fade-in zoom-in-95 duration-100"
                   onClick={() => setIsCloudDropdownOpen(false)}
                 >
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
                     <span>💻</span>
                     <span>From Device</span>
@@ -678,7 +682,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                       setCloudSource('gdrive');
                       setIsCloudModalOpen(true);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
                     <span>📁</span>
                     <span>From Google Drive</span>
@@ -688,7 +692,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                       setCloudSource('dropbox');
                       setIsCloudModalOpen(true);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
                     <span>📦</span>
                     <span>From Dropbox</span>
@@ -698,7 +702,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                       setCloudSource('onedrive');
                       setIsCloudModalOpen(true);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
                     <span>☁️</span>
                     <span>From OneDrive</span>
@@ -709,7 +713,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                       setCloudSource('url');
                       setIsCloudModalOpen(true);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
                     <LinkIcon className="h-3.5 w-3.5 text-slate-400" />
                     <span>By Web URL</span>
@@ -718,14 +722,14 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
               )}
             </div>
 
-            {/* Quick Direct Cloud Buttons */}
+            {/* Quick Direct Cloud Buttons with soft hover scale */}
             <button
               id="from-gdrive-btn"
               onClick={() => {
                 setCloudSource('gdrive');
                 setIsCloudModalOpen(true);
               }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/90 dark:bg-slate-800/90 px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-white hover:border-indigo-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer backdrop-blur-xs"
             >
               <span>📁</span>
               <span className="hidden sm:inline">Google Drive</span>
@@ -737,7 +741,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                 setCloudSource('dropbox');
                 setIsCloudModalOpen(true);
               }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/90 dark:bg-slate-800/90 px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-white hover:border-indigo-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer backdrop-blur-xs"
             >
               <span>📦</span>
               <span className="hidden sm:inline">Dropbox</span>
@@ -749,7 +753,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                 setCloudSource('onedrive');
                 setIsCloudModalOpen(true);
               }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/90 dark:bg-slate-800/90 px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-white hover:border-indigo-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer backdrop-blur-xs"
             >
               <span>☁️</span>
               <span className="hidden sm:inline">OneDrive</span>
@@ -761,20 +765,20 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                 setCloudSource('url');
                 setIsCloudModalOpen(true);
               }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/90 dark:bg-slate-800/90 px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-white hover:border-indigo-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer backdrop-blur-xs"
             >
-              <LinkIcon className="h-3.5 w-3.5 text-slate-400" />
+              <LinkIcon className="h-3.5 w-3.5 text-indigo-500" />
               <span>URL</span>
             </button>
           </div>
 
           {/* Supported formats & limits */}
           <div className="mt-8 flex flex-col items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
-            <span className="font-medium tracking-wide uppercase text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="font-semibold tracking-wide uppercase text-[11px] text-slate-500 dark:text-slate-400">
               {t.hero.supportedBanner}
             </span>
-            <span className="flex items-center gap-1.5 text-[11px]">
-              <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+            <span className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
               {t.uploader.maxLimitNotice}
             </span>
           </div>
@@ -785,20 +789,20 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
       {items.length > 0 && (
         <div className="mt-8 space-y-4">
           {/* Top batch control bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-slate-800 dark:text-white">
+              <span className="text-sm font-bold text-slate-800 dark:text-white">
                 {items.length} {items.length === 1 ? 'file' : 'files'} in queue
               </span>
 
               {/* Batch target format */}
               <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                <span>Convert all to:</span>
+                <span className="font-medium">Convert all to:</span>
                 <select
                   id="batch-target-format-select"
                   value={batchTarget}
                   onChange={(e) => handleBatchFormatChange(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="rounded-xl border border-slate-200 bg-slate-50/90 px-2.5 py-1 text-xs font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800/90 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">Select target</option>
                   <option value="webp">WEBP (Image)</option>
@@ -812,13 +816,13 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
               </div>
 
               {/* Engine mode switcher */}
-              <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 dark:border-slate-700 dark:bg-slate-800">
-                <Cpu className="h-3.5 w-3.5 text-blue-500" />
+              <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/90 px-2.5 py-1 dark:border-slate-700 dark:bg-slate-800/90">
+                <Cpu className="h-3.5 w-3.5 text-indigo-500" />
                 <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Engine:</span>
                 <select
                   value={engineMode}
                   onChange={(e) => setEngineMode(e.target.value as any)}
-                  className="bg-transparent text-[11px] font-bold text-blue-600 dark:text-blue-400 focus:outline-none cursor-pointer"
+                  className="bg-transparent text-[11px] font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer"
                 >
                   <option value="auto">⚡ Auto (WASM First)</option>
                   <option value="wasm">⚡ WASM In-Browser Only</option>
@@ -831,9 +835,9 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
               <button
                 id="add-more-files-btn"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:scale-[1.02] active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 transition-all cursor-pointer"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5 text-indigo-500" />
                 <span>{t.actions.addMore}</span>
               </button>
 
@@ -841,7 +845,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                 <button
                   id="download-zip-btn"
                   onClick={handleDownloadAllZip}
-                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm shadow-emerald-600/20"
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-3.5 py-1.5 text-xs font-bold text-white hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-emerald-600/25 transition-all cursor-pointer"
                 >
                   <FolderArchive className="h-3.5 w-3.5" />
                   <span>{t.actions.downloadZip}</span>
@@ -853,7 +857,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                   id="convert-all-btn"
                   onClick={handleConvertAll}
                   disabled={isConvertingAll}
-                  className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 shadow-sm shadow-blue-500/20 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-4 py-1.5 text-xs font-bold text-white hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-indigo-500/25 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isConvertingAll ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -867,7 +871,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
               <button
                 id="clear-all-queue-btn"
                 onClick={() => setItems([])}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-rose-600 dark:hover:bg-slate-800"
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-rose-600 hover:scale-105 active:scale-95 dark:hover:bg-slate-800 transition-all cursor-pointer"
                 title="Clear all"
               >
                 <Trash2 className="h-4 w-4" />
@@ -886,13 +890,13 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                 <div
                   key={item.id}
                   id={`file-card-${item.id}`}
-                  className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 transition-all hover:border-slate-300 dark:hover:border-slate-700"
+                  className="group rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-xs dark:border-slate-800/80 dark:bg-slate-900/80 backdrop-blur-sm transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-lg hover:shadow-indigo-500/5 hover:-translate-y-0.5"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     {/* Left: Thumbnail & Name & Sizes */}
                     <div className="flex items-center gap-3.5 min-w-0">
                       {/* Thumbnail or Category Icon */}
-                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
                         {item.previewUrl ? (
                           <img
                             src={item.previewUrl}
@@ -902,7 +906,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                         ) : (
                           <FileIcon className="h-6 w-6 text-slate-400 dark:text-slate-500" />
                         )}
-                        <span className="absolute bottom-0 inset-x-0 bg-slate-900/70 text-[9px] font-bold text-white text-center uppercase tracking-wider py-0.5">
+                        <span className="absolute bottom-0 inset-x-0 bg-slate-950/80 text-[9px] font-bold text-white text-center uppercase tracking-wider py-0.5 backdrop-blur-xs">
                           {item.extension}
                         </span>
                       </div>
@@ -910,11 +914,11 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                       {/* File Details */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate max-w-[280px] sm:max-w-md">
+                          <p className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate max-w-[280px] sm:max-w-md group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                             {item.originalName}
                           </p>
                           {isCompleted && (
-                            <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1">
+                            <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 px-2 py-0.5 text-[11px] font-bold flex items-center gap-1">
                               <CheckCircle2 className="h-3 w-3" /> Ready
                             </span>
                           )}
@@ -940,12 +944,12 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
 
                           {/* WASM vs Server Badge */}
                           {item.engineMode === 'wasm' || (!item.engineMode && canConvertClientSide(item.extension, item.targetFormat)) ? (
-                            <span className="inline-flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.2 text-[10px] font-bold text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/50">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-900/50">
                               <Cpu className="h-2.5 w-2.5" />
                               {isCompleted ? 'WASM Local' : 'WASM In-Browser'}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 text-[10px] font-medium text-slate-500">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 text-[10px] font-medium text-slate-500">
                               <Server className="h-2.5 w-2.5" />
                               Server Mode
                             </span>
@@ -972,7 +976,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                                   )
                                 );
                               }}
-                              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-900 uppercase dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                              className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-900 uppercase dark:border-slate-700 dark:bg-slate-800 dark:text-white cursor-pointer focus:ring-2 focus:ring-indigo-500"
                             >
                               {item.supportedTargets.map((target) => (
                                 <option key={target} value={target}>
@@ -986,7 +990,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                           <button
                             onClick={() => setActiveSettingsItem(item)}
                             disabled={isBusy}
-                            className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                            className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 hover:scale-105 active:scale-95 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 transition-all cursor-pointer"
                             title="Advanced Settings"
                           >
                             <Settings className="h-4 w-4" />
@@ -996,7 +1000,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                           <button
                             onClick={() => convertItem(item.id)}
                             disabled={isBusy}
-                            className="flex items-center gap-1 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 shadow-xs"
+                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-4 py-2 text-xs font-bold text-white hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-indigo-500/20 disabled:opacity-50 transition-all cursor-pointer"
                           >
                             {isBusy ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1012,7 +1016,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                           <a
                             href={item.downloadUrl || '#'}
                             download={item.outputFilename}
-                            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm shadow-emerald-600/20"
+                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-4 py-2 text-xs font-bold text-white hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-emerald-600/25 transition-all cursor-pointer"
                           >
                             <Download className="h-3.5 w-3.5" />
                             <span>{t.actions.download}</span>
@@ -1020,7 +1024,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
 
                           <button
                             onClick={() => handleRemoveItem(item.id)}
-                            className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-rose-600 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                            className="rounded-xl border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-rose-600 hover:scale-105 active:scale-95 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 transition-all cursor-pointer"
                             title="Delete and remove"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1031,7 +1035,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                       {!isCompleted && !isBusy && (
                         <button
                           onClick={() => handleRemoveItem(item.id)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:text-rose-500"
+                          className="rounded-xl p-2 text-slate-400 hover:text-rose-500 hover:scale-105 active:scale-95 transition-all cursor-pointer"
                           title="Remove from queue"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1044,18 +1048,18 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
                   {isBusy && (
                     <div className="mt-3">
                       <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                        <span>
+                        <span className="font-medium">
                           {item.status === 'uploading'
                             ? t.actions.uploading
                             : item.status === 'queued'
                             ? 'In queue...'
                             : t.actions.processing}
                         </span>
-                        <span>{item.progress}%</span>
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400">{item.progress}%</span>
                       </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                         <div
-                          className="h-full bg-blue-600 transition-all duration-300 rounded-full"
+                          className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-all duration-300 rounded-full animate-shimmer"
                           style={{ width: `${item.progress}%` }}
                         />
                       </div>

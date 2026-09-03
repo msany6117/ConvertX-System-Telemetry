@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Layers,
   Search,
@@ -271,30 +272,51 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 transition-colors">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/80 backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-950/80 transition-colors">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Brand Logo */}
+        {/* Brand Logo Redesign */}
         <div className="flex items-center gap-4 xl:gap-6">
           <button
             id="brand-logo-btn"
             onClick={() => handleNav('/')}
-            className="flex items-center gap-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg p-1 transition-transform active:scale-95"
+            className="group flex items-center gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-xl p-1 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 10h10a3 3 0 0 1 3 3v1m-3-2 3-2 3 2" />
-                <path d="M17 14H7a3 3 0 0 1-3-3v-1m3 2-3 2-3-2" />
-                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+            {/* Modern Vector Squircle Logo */}
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 ring-1 ring-white/25 overflow-hidden transition-all duration-300 group-hover:shadow-indigo-500/40 group-hover:scale-105">
+              {/* Subtle glass specular highlight */}
+              <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/10 to-white/20 pointer-events-none rounded-xl" />
+              
+              {/* Intertwined 'C' Loop & 'X' Interchange Vector Icon */}
+              <svg
+                className="h-5 w-5 text-white drop-shadow-sm transition-transform duration-300 group-hover:rotate-12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 16V8a3.5 3.5 0 0 1 3.5-3.5h3" />
+                <path d="M7 13.5L10 16.5L7 19.5" />
+                <path d="M20 8v8a3.5 3.5 0 0 1-3.5 3.5h-3" />
+                <path d="M17 10.5L14 7.5L17 4.5" />
+                <path d="M9.5 9.5L14.5 14.5" />
+                <path d="M14.5 9.5L9.5 14.5" />
               </svg>
             </div>
+
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">ConvertX</span>
-                <span className="rounded bg-blue-50 dark:bg-blue-950 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60">
-                  FREE
+                <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                  Convert<span className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">X</span>
+                </span>
+                <span className="rounded-full bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 text-indigo-600 dark:text-purple-300 px-2 py-0.5 text-[9px] font-black tracking-widest uppercase border border-indigo-500/30 dark:border-purple-500/40 shadow-xs">
+                  ULTRA
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 -mt-0.5 hidden sm:block">Open-Source Engine</p>
+              <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 -mt-0.5 hidden sm:block tracking-normal">
+                Fast • Secure • Client-Side
+              </p>
             </div>
           </button>
 
@@ -320,92 +342,104 @@ export const Navbar: React.FC<NavbarProps> = ({
                         handleMouseEnter(cat.id);
                       }
                     }}
-                    className={`flex items-center gap-1 px-2.5 py-2 rounded-lg text-xs xl:text-sm font-medium transition-all ${
+                    className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs xl:text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
                       active || isDropdownOpen
-                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/70 dark:text-blue-400 font-semibold'
+                        ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-indigo-600 dark:from-indigo-950/70 dark:to-purple-950/70 dark:text-indigo-400 font-bold border border-indigo-500/20'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
                     }`}
                   >
                     <span>{language === 'bn' ? cat.labelBn : cat.labelEn}</span>
                     <ChevronDown
                       className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                        isDropdownOpen ? 'rotate-180 text-blue-600 dark:text-blue-400' : 'text-slate-400'
+                        isDropdownOpen ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
                       }`}
                     />
                   </button>
 
-                  {/* Multi-Level Dropdown Popup */}
-                  {isDropdownOpen && (
-                    <div
-                      className="absolute left-0 top-full pt-1.5 z-50 w-72 sm:w-80 xl:w-96 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150"
-                      onMouseEnter={() => handleMouseEnter(cat.id)}
-                      onMouseLeave={handleMouseLeave}
-                    >
-                      {/* Dropdown Header */}
-                      <div className="flex items-center justify-between px-2.5 py-1.5 mb-1 border-b border-slate-100 dark:border-slate-800">
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                          {language === 'bn' ? cat.labelBn : cat.labelEn} Tools
-                        </span>
-                        <button
-                          onClick={() => handleNav(cat.route)}
-                          className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 cursor-pointer"
-                        >
-                          <span>Explore All</span>
-                          <ArrowRight className="h-3 w-3" />
-                        </button>
-                      </div>
-
-                      {/* Sub-Items List */}
-                      <div className="space-y-1">
-                        {cat.items.map((item) => {
-                          const ItemIcon = item.icon || cat.icon;
-                          const isItemActive = currentRoute === item.route;
-
-                          return (
+                  {/* Multi-Level Dropdown Popup with Butter-Smooth Framer Motion */}
+                  <AnimatePresence>
+                    {isDropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                        transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                        className="absolute left-0 top-full pt-2 z-50 w-72 sm:w-80 xl:w-96"
+                        onMouseEnter={() => handleMouseEnter(cat.id)}
+                        onMouseLeave={handleMouseLeave}
+                      >
+                        <div className="rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-xl p-2.5 shadow-2xl shadow-indigo-950/10 dark:border-slate-800/90 dark:bg-slate-900/95 dark:shadow-black/50">
+                          {/* Dropdown Header */}
+                          <div className="flex items-center justify-between px-2.5 py-1.5 mb-1 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                              {language === 'bn' ? cat.labelBn : cat.labelEn} Tools
+                            </span>
                             <button
-                              key={item.id}
-                              onClick={() => handleNav(item.route)}
-                              className={`flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors cursor-pointer ${
-                                isItemActive
-                                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300'
-                                  : 'hover:bg-slate-100 dark:hover:bg-slate-800/80'
-                              }`}
+                              onClick={() => handleNav(cat.route)}
+                              className="group flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 cursor-pointer transition-all hover:scale-[1.02]"
                             >
-                              <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-                                isItemActive
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-                              }`}>
-                                <ItemIcon className="h-4 w-4" />
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center justify-between">
-                                  <span className={`text-xs font-bold leading-tight ${
-                                    isItemActive
-                                      ? 'text-blue-700 dark:text-blue-300'
-                                      : 'text-slate-800 dark:text-slate-100'
-                                  }`}>
-                                    {item.name}
-                                  </span>
-                                  {item.badge && (
-                                    <span className="rounded bg-blue-50 px-1.5 py-0.2 text-[9px] font-semibold text-blue-600 dark:bg-blue-950 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50">
-                                      {item.badge}
-                                    </span>
-                                  )}
-                                </div>
-                                {item.desc && (
-                                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                    {item.desc}
-                                  </p>
-                                )}
-                              </div>
+                              <span>Explore All</span>
+                              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
                             </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                          </div>
+
+                          {/* Sub-Items List */}
+                          <div className="space-y-1">
+                            {cat.items.map((item) => {
+                              const ItemIcon = item.icon || cat.icon;
+                              const isItemActive = currentRoute === item.route;
+
+                              return (
+                                <button
+                                  key={item.id}
+                                  onClick={() => handleNav(item.route)}
+                                  className={`group flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition-all duration-200 hover:scale-[1.01] cursor-pointer ${
+                                    isItemActive
+                                      ? 'bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 dark:from-indigo-950/70 dark:to-purple-950/70 dark:text-indigo-300 border border-indigo-500/20 shadow-xs'
+                                      : 'hover:bg-slate-100/90 dark:hover:bg-slate-800/80'
+                                  }`}
+                                >
+                                  <div
+                                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6 ${
+                                      isItemActive
+                                        ? 'bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-xs shadow-indigo-500/30'
+                                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                                    }`}
+                                  >
+                                    <ItemIcon className="h-4 w-4" />
+                                  </div>
+
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center justify-between">
+                                      <span
+                                        className={`text-xs font-bold leading-tight ${
+                                          isItemActive
+                                            ? 'text-indigo-700 dark:text-indigo-300'
+                                            : 'text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                                        }`}
+                                      >
+                                        {item.name}
+                                      </span>
+                                      {item.badge && (
+                                        <span className="rounded-md bg-indigo-50 px-1.5 py-0.2 text-[9px] font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60">
+                                          {item.badge}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {item.desc && (
+                                      <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                        {item.desc}
+                                      </p>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })}
@@ -418,11 +452,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             id="search-trigger-btn"
             onClick={onOpenSearch}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-500 hover:border-slate-300 hover:bg-white hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-white transition-all shadow-2xs cursor-pointer"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs text-slate-500 hover:border-indigo-300 hover:bg-white hover:text-slate-800 hover:shadow-md hover:shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400 dark:hover:border-indigo-500 dark:hover:text-white transition-all cursor-pointer"
             aria-label="Search tools"
           >
-            <Search className="h-4 w-4" />
-            <span className="hidden sm:inline">{t.nav.search}</span>
+            <Search className="h-4 w-4 text-indigo-500" />
+            <span className="hidden sm:inline font-medium">{t.nav.search}</span>
             <kbd className="hidden md:inline rounded bg-slate-200/70 dark:bg-slate-700 px-1.5 py-0.5 text-[10px] font-mono text-slate-600 dark:text-slate-300">
               ⌘K
             </kbd>
@@ -432,10 +466,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             id="language-toggle-btn"
             onClick={() => langHandler(language === 'en' ? 'bn' : 'en')}
-            className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="flex items-center gap-1 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:scale-105 active:scale-95 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all cursor-pointer"
             title="Switch Language"
           >
-            <Languages className="h-3.5 w-3.5 text-blue-500" />
+            <Languages className="h-3.5 w-3.5 text-indigo-500" />
             <span>{language === 'en' ? 'EN' : 'বাং'}</span>
           </button>
 
@@ -443,7 +477,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             id="theme-toggle-btn"
             onClick={themeHandler}
-            className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+            className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 hover:scale-105 active:scale-95 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white transition-all cursor-pointer"
             aria-label="Toggle theme"
           >
             {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4 text-amber-400" />}
@@ -453,7 +487,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             id="mobile-menu-btn"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+            className="lg:hidden rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:scale-105 active:scale-95 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer transition-all"
             aria-label="Open mobile navigation"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -462,32 +496,54 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* MOBILE DRAWER WITH BACKDROP & ACCORDIONS */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          {/* Dark Backdrop Overlay */}
-          <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setMobileMenuOpen(false)}
-          />
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <div className="lg:hidden fixed inset-0 z-50 flex">
+            {/* Dark Backdrop Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
+              onClick={() => setMobileMenuOpen(false)}
+            />
 
-          {/* Slide-in Mobile Drawer Panel */}
-          <div className="relative ml-auto flex h-full w-full max-w-sm flex-col border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-2xl z-10 overflow-y-auto">
-            {/* Drawer Header */}
-            <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold">
-                  C
+            {/* Slide-in Mobile Drawer Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className="relative ml-auto flex h-full w-full max-w-sm flex-col border-l border-slate-200/80 bg-white/95 dark:border-slate-800/80 dark:bg-slate-900/95 backdrop-blur-xl shadow-2xl z-10 overflow-y-auto"
+            >
+              {/* Drawer Header */}
+              <div className="flex h-16 items-center justify-between border-b border-slate-200/80 px-5 dark:border-slate-800/80">
+                <div className="flex items-center gap-2.5">
+                  <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25">
+                    <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 16V8a3.5 3.5 0 0 1 3.5-3.5h3" />
+                      <path d="M7 13.5L10 16.5L7 19.5" />
+                      <path d="M20 8v8a3.5 3.5 0 0 1-3.5 3.5h-3" />
+                      <path d="M17 10.5L14 7.5L17 4.5" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="font-black text-slate-900 dark:text-white text-base">
+                      Convert<span className="bg-gradient-to-r from-indigo-500 to-pink-500 bg-clip-text text-transparent">X</span>
+                    </span>
+                    <span className="ml-1.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-purple-300 px-1.5 py-0.2 text-[9px] font-black border border-indigo-500/20">
+                      ULTRA
+                    </span>
+                  </div>
                 </div>
-                <span className="font-bold text-slate-900 dark:text-white text-base">Navigation</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:scale-105 active:scale-95 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  aria-label="Close menu"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                aria-label="Close menu"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
             {/* Quick Search in Mobile Menu */}
             <div className="p-4 border-b border-slate-100 dark:border-slate-800">
@@ -607,9 +663,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
+    </AnimatePresence>
     </header>
   );
 };
