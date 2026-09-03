@@ -49,21 +49,27 @@ interface NavCategory {
 }
 
 interface NavbarProps {
-  currentRoute: string;
-  navigate: (route: string) => void;
+  currentRoute?: string;
+  onNavigate?: (route: string) => void;
+  navigate?: (route: string) => void;
   language: Language;
-  setLanguage: (lang: Language) => void;
+  onLanguageChange?: (lang: Language) => void;
+  setLanguage?: (lang: Language) => void;
   theme: Theme;
-  setTheme: (theme: Theme) => void;
+  onThemeToggle?: () => void;
+  setTheme?: (theme: Theme) => void;
   onOpenSearch: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  currentRoute,
+  currentRoute = '/',
+  onNavigate,
   navigate,
   language,
+  onLanguageChange,
   setLanguage,
   theme,
+  onThemeToggle,
   setTheme,
   onOpenSearch,
 }) => {
@@ -73,6 +79,36 @@ export const Navbar: React.FC<NavbarProps> = ({
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const t = language === 'bn' ? bn : en;
+
+  const navHandler = (route: string) => {
+    if (onNavigate) {
+      onNavigate(route);
+    } else if (navigate) {
+      navigate(route);
+    }
+  };
+
+  const langHandler = (lang: Language) => {
+    if (onLanguageChange) {
+      onLanguageChange(lang);
+    } else if (setLanguage) {
+      setLanguage(lang);
+    }
+  };
+
+  const themeHandler = () => {
+    if (onThemeToggle) {
+      onThemeToggle();
+    } else if (setTheme) {
+      setTheme(theme === 'light' ? 'dark' : 'light');
+    }
+  };
+
+  const handleNav = (r: string) => {
+    navHandler(r);
+    setActiveDropdown(null);
+    setMobileMenuOpen(false);
+  };
 
   const navCategories: NavCategory[] = [
     {
@@ -97,10 +133,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       route: '/compress',
       icon: Minimize2,
       items: [
-        { id: 'comp-pdf', name: 'Compress PDF', route: '/compress-pdf', desc: 'Reduce PDF file size for sharing', badge: 'Popular', icon: FileText },
-        { id: 'comp-img', name: 'Image Compressor', route: '/image-compressor', desc: 'Shrink JPG, PNG, WebP with zero blur', badge: 'Popular', icon: ImageIcon },
-        { id: 'comp-vid', name: 'Video Compressor', route: '/video-compressor', desc: 'Reduce video MBs while keeping 1080p', icon: Video },
-        { id: 'comp-aud', name: 'Audio Compressor', route: '/audio-compressor', desc: 'Tune bitrate down to 64kbps', icon: Music },
+        { id: 'comp-pdf', name: 'Compress PDF', route: '/pdf/compress', desc: 'Reduce PDF file size for sharing', badge: 'Popular', icon: FileText },
+        { id: 'comp-img', name: 'Image Compressor', route: '/image/image-compressor', desc: 'Shrink JPG, PNG, WebP with zero blur', badge: 'Popular', icon: ImageIcon },
+        { id: 'comp-vid', name: 'Video Compressor', route: '/video/video-compressor', desc: 'Reduce video MBs while keeping 1080p', icon: Video },
+        { id: 'comp-aud', name: 'Audio Compressor', route: '/audio/audio-compressor', desc: 'Tune bitrate down to 64kbps', icon: Music },
         { id: 'comp-hub', name: 'All Compression Tools', route: '/compress', desc: 'Dedicated compression hub', icon: Minimize2 },
       ],
     },
@@ -111,12 +147,12 @@ export const Navbar: React.FC<NavbarProps> = ({
       route: '/video',
       icon: Video,
       items: [
-        { id: 'v-mp4-mp3', name: 'MP4 to MP3', route: '/mp4-to-mp3', desc: 'Extract high-bitrate audio track', badge: 'Popular', icon: Music },
-        { id: 'v-comp', name: 'Video Compressor', route: '/video-compressor', desc: 'Shrink video file sizes', icon: Minimize2 },
-        { id: 'v-gif', name: 'Video to GIF', route: '/mp4-to-gif', desc: 'Make optimized animated GIFs', badge: 'Popular', icon: Film },
-        { id: 'v-webm', name: 'MP4 to WebM', route: '/mp4-to-webm', desc: 'Ultra-efficient web streaming', icon: Video },
-        { id: 'v-mov', name: 'MOV to MP4', route: '/mov-to-mp4', desc: 'Apple QuickTime to universal MP4', icon: Video },
-        { id: 'v-mkv', name: 'MKV to MP4', route: '/mkv-to-mp4', desc: 'Container conversion without loss', icon: Video },
+        { id: 'v-mp4-mp3', name: 'MP4 to MP3', route: '/video/mp4-to-mp3', desc: 'Extract high-bitrate audio track', badge: 'Popular', icon: Music },
+        { id: 'v-comp', name: 'Video Compressor', route: '/video/video-compressor', desc: 'Shrink video file sizes', icon: Minimize2 },
+        { id: 'v-gif', name: 'Video to GIF', route: '/video/mp4-to-gif', desc: 'Make optimized animated GIFs', badge: 'Popular', icon: Film },
+        { id: 'v-webm', name: 'MP4 to WebM', route: '/video/mp4-to-webm', desc: 'Ultra-efficient web streaming', icon: Video },
+        { id: 'v-mov', name: 'MOV to MP4', route: '/video/mov-to-mp4', desc: 'Apple QuickTime to universal MP4', icon: Video },
+        { id: 'v-mkv', name: 'MKV to MP4', route: '/video/mkv-to-mp4', desc: 'Container conversion without loss', icon: Video },
         { id: 'v-hub', name: 'All Video Converters', route: '/video', desc: 'Full suite of video utilities', icon: Video },
       ],
     },
@@ -127,11 +163,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       route: '/audio',
       icon: Music,
       items: [
-        { id: 'a-mp3-wav', name: 'MP3 to WAV', route: '/mp3-to-wav', desc: 'Uncompressed broadcast WAV', icon: Music },
-        { id: 'a-wav-mp3', name: 'WAV to MP3', route: '/wav-to-mp3', desc: 'Lossless audio to 320kbps MP3', badge: 'Popular', icon: Music },
-        { id: 'a-flac-mp3', name: 'FLAC to MP3', route: '/flac-to-mp3', desc: 'Audiophile tracks to portable MP3', icon: Music },
-        { id: 'a-m4a-mp3', name: 'M4A to MP3', route: '/m4a-to-mp3', desc: 'Apple voice memo / iTunes convert', icon: Music },
-        { id: 'a-comp', name: 'Audio Compressor', route: '/audio-compressor', desc: 'Compress bitrates cleanly', icon: Minimize2 },
+        { id: 'a-mp3-wav', name: 'MP3 to WAV', route: '/audio/mp3-to-wav', desc: 'Uncompressed broadcast WAV', icon: Music },
+        { id: 'a-wav-mp3', name: 'WAV to MP3', route: '/audio/wav-to-mp3', desc: 'Lossless audio to 320kbps MP3', badge: 'Popular', icon: Music },
+        { id: 'a-flac-mp3', name: 'FLAC to MP3', route: '/audio/flac-to-mp3', desc: 'Audiophile tracks to portable MP3', icon: Music },
+        { id: 'a-m4a-mp3', name: 'M4A to MP3', route: '/audio/m4a-to-mp3', desc: 'Apple voice memo / iTunes convert', icon: Music },
+        { id: 'a-comp', name: 'Audio Compressor', route: '/audio/audio-compressor', desc: 'Compress bitrates cleanly', icon: Minimize2 },
         { id: 'a-hub', name: 'All Audio Converters', route: '/audio', desc: 'Full audio conversion workspace', icon: Music },
       ],
     },
@@ -142,13 +178,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       route: '/image',
       icon: ImageIcon,
       items: [
-        { id: 'i-heic-jpg', name: 'HEIC to JPG', route: '/heic-to-jpg', desc: 'iPhone photos to standard JPG', badge: 'Popular', icon: ImageIcon },
-        { id: 'i-jpg-webp', name: 'JPG to WEBP', route: '/jpg-to-webp', desc: 'Modern high compression WebP', badge: 'Popular', icon: ImageIcon },
-        { id: 'i-png-jpg', name: 'PNG to JPG', route: '/png-to-jpg', desc: 'Transparent PNG into lightweight JPG', icon: ImageIcon },
-        { id: 'i-webp-jpg', name: 'WEBP to JPG', route: '/webp-to-jpg', desc: 'WebP images to universal JPG', icon: ImageIcon },
-        { id: 'i-resizer', name: 'Image Resizer', route: '/image-resizer', desc: 'Dimensions & social presets', badge: 'Tool', icon: Maximize2 },
-        { id: 'i-crop', name: 'Image Cropper', route: '/image-crop', desc: 'Aspect ratios & 90° rotation', badge: 'Tool', icon: Crop },
-        { id: 'i-comp', name: 'Image Compressor', route: '/image-compressor', desc: 'Optimize JPG, PNG, WebP MBs', icon: Minimize2 },
+        { id: 'i-heic-jpg', name: 'HEIC to JPG', route: '/image/heic-to-jpg', desc: 'iPhone photos to standard JPG', badge: 'Popular', icon: ImageIcon },
+        { id: 'i-jpg-webp', name: 'JPG to WEBP', route: '/image/jpg-to-webp', desc: 'Modern high compression WebP', badge: 'Popular', icon: ImageIcon },
+        { id: 'i-png-jpg', name: 'PNG to JPG', route: '/image/png-to-jpg', desc: 'Transparent PNG into lightweight JPG', icon: ImageIcon },
+        { id: 'i-webp-jpg', name: 'WEBP to JPG', route: '/image/webp-to-jpg', desc: 'WebP images to universal JPG', icon: ImageIcon },
+        { id: 'i-resizer', name: 'Image Resizer', route: '/image/image-resizer', desc: 'Dimensions & social presets', badge: 'Tool', icon: Maximize2 },
+        { id: 'i-crop', name: 'Image Cropper', route: '/image/image-crop', desc: 'Aspect ratios & 90° rotation', badge: 'Tool', icon: Crop },
+        { id: 'i-comp', name: 'Image Compressor', route: '/image/image-compressor', desc: 'Optimize JPG, PNG, WebP MBs', icon: Minimize2 },
         { id: 'i-hub', name: 'All Image Converters', route: '/image', desc: 'Explore all photo tools', icon: ImageIcon },
       ],
     },
@@ -159,12 +195,12 @@ export const Navbar: React.FC<NavbarProps> = ({
       route: '/pdf',
       icon: FileText,
       items: [
-        { id: 'p-merge', name: 'Merge PDF', route: '/merge-pdf', desc: 'Combine multiple PDF files', badge: 'Popular', icon: Layers },
-        { id: 'p-split', name: 'Split PDF', route: '/split-pdf', desc: 'Extract pages into single PDF or ZIP', badge: 'Popular', icon: Scissors },
-        { id: 'p-comp', name: 'Compress PDF', route: '/compress-pdf', desc: 'Shrink document file size', icon: Minimize2 },
-        { id: 'p-rotate', name: 'Rotate PDF', route: '/rotate-pdf', desc: 'Permanently reorient pages', icon: RotateCw },
-        { id: 'p-to-jpg', name: 'PDF to JPG', route: '/pdf-to-jpg', desc: 'Render pages into high-res images', icon: ImageIcon },
-        { id: 'p-from-jpg', name: 'Images to PDF', route: '/jpg-to-pdf', desc: 'Combine photos into a neat document', icon: FileText },
+        { id: 'p-merge', name: 'Merge PDF', route: '/pdf/merge', desc: 'Combine multiple PDF files', badge: 'Popular', icon: Layers },
+        { id: 'p-split', name: 'Split PDF', route: '/pdf/split', desc: 'Extract pages into single PDF or ZIP', badge: 'Popular', icon: Scissors },
+        { id: 'p-comp', name: 'Compress PDF', route: '/pdf/compress', desc: 'Shrink document file size', icon: Minimize2 },
+        { id: 'p-rotate', name: 'Rotate PDF', route: '/pdf/rotate', desc: 'Permanently reorient pages', icon: RotateCw },
+        { id: 'p-to-jpg', name: 'PDF to JPG', route: '/pdf/pdf-to-jpg', desc: 'Render pages into high-res images', icon: ImageIcon },
+        { id: 'p-from-jpg', name: 'Images to PDF', route: '/pdf/jpg-to-pdf', desc: 'Combine photos into a neat document', icon: FileText },
         { id: 'p-hub', name: 'All PDF Tools', route: '/pdf', desc: 'Full client-side PDF suite', icon: FileText },
       ],
     },
@@ -175,11 +211,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       route: '/documents',
       icon: BookOpen,
       items: [
-        { id: 'd-docx-pdf', name: 'Word (DOCX) to PDF', route: '/docx-to-pdf', desc: 'Convert Word docs to read-only PDF', badge: 'Popular', icon: FileText },
-        { id: 'd-epub-pdf', name: 'EPUB to PDF', route: '/epub-to-pdf', desc: 'Convert e-books to printable PDF', icon: BookOpen },
-        { id: 'd-mobi-epub', name: 'MOBI to EPUB', route: '/mobi-to-epub', desc: 'Kindle books to open e-reader format', icon: BookOpen },
-        { id: 'd-xlsx-csv', name: 'Excel to CSV', route: '/xlsx-to-csv', desc: 'Spreadsheets into plain tables', icon: FileText },
-        { id: 'd-txt-pdf', name: 'Text to PDF', route: '/txt-to-pdf', desc: 'Plain text files to formatted PDF', icon: FileText },
+        { id: 'd-docx-pdf', name: 'Word (DOCX) to PDF', route: '/documents/docx-to-pdf', desc: 'Convert Word docs to read-only PDF', badge: 'Popular', icon: FileText },
+        { id: 'd-epub-pdf', name: 'EPUB to PDF', route: '/documents/epub-to-pdf', desc: 'Convert e-books to printable PDF', icon: BookOpen },
+        { id: 'd-mobi-epub', name: 'MOBI to EPUB', route: '/documents/mobi-to-epub', desc: 'Kindle books to open e-reader format', icon: BookOpen },
+        { id: 'd-xlsx-csv', name: 'Excel to CSV', route: '/documents/xlsx-to-csv', desc: 'Spreadsheets into plain tables', icon: FileText },
+        { id: 'd-txt-pdf', name: 'Text to PDF', route: '/documents/txt-to-pdf', desc: 'Plain text files to formatted PDF', icon: FileText },
         { id: 'd-hub', name: 'All Document Tools', route: '/documents', desc: 'Spreadsheets, e-books & docs', icon: BookOpen },
       ],
     },
@@ -190,21 +226,15 @@ export const Navbar: React.FC<NavbarProps> = ({
       route: '/tools',
       icon: Grid,
       items: [
-        { id: 't-units', name: 'Unit Converter', route: '/units', desc: '13 live measurement categories', badge: 'Interactive', icon: Scale },
-        { id: 't-time', name: 'Time Zone Converter', route: '/time', desc: 'World clock & offset calculator', badge: 'Interactive', icon: Clock },
-        { id: 't-resizer', name: 'Image Resizer', route: '/image-resizer', desc: 'Fast client-side dimensions', icon: Maximize2 },
-        { id: 't-crop', name: 'Image Cropper', route: '/image-crop', desc: 'Aspect ratios & rotation', icon: Crop },
-        { id: 't-merge', name: 'Merge PDF', route: '/merge-pdf', desc: 'Combine multiple PDF documents', icon: Layers },
+        { id: 't-units', name: 'Unit Converter', route: '/tools/unit-converter', desc: '13 live measurement categories', badge: 'Interactive', icon: Scale },
+        { id: 't-time', name: 'Time Zone Converter', route: '/tools/timezone-converter', desc: 'World clock & offset calculator', badge: 'Interactive', icon: Clock },
+        { id: 't-resizer', name: 'Image Resizer', route: '/image/image-resizer', desc: 'Fast client-side dimensions', icon: Maximize2 },
+        { id: 't-crop', name: 'Image Cropper', route: '/image/image-crop', desc: 'Aspect ratios & rotation', icon: Crop },
+        { id: 't-merge', name: 'Merge PDF', route: '/pdf/merge', desc: 'Combine multiple PDF documents', icon: Layers },
         { id: 't-all', name: 'All 50+ Tools Directory', route: '/tools', desc: 'Comprehensive searchable list', badge: 'Full', icon: Grid },
       ],
     },
   ];
-
-  const handleNav = (r: string) => {
-    navigate(r);
-    setActiveDropdown(null);
-    setMobileMenuOpen(false);
-  };
 
   // Dropdown hover delay logic to prevent jitter
   const handleMouseEnter = (catId: string) => {
@@ -236,6 +266,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   // Check if a category is active based on currentRoute
   const isCategoryActive = (cat: NavCategory) => {
     if (currentRoute === cat.route) return true;
+    if (cat.id !== 'convert' && currentRoute.startsWith(`/${cat.id}`)) return true;
     return cat.items.some((item) => item.route === currentRoute);
   };
 
@@ -400,7 +431,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Language Toggle (EN / BN) */}
           <button
             id="language-toggle-btn"
-            onClick={() => setLanguage(language === 'en' ? 'bn' : 'en')}
+            onClick={() => langHandler(language === 'en' ? 'bn' : 'en')}
             className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             title="Switch Language"
           >
@@ -411,7 +442,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Dark / Light Theme Toggle */}
           <button
             id="theme-toggle-btn"
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            onClick={themeHandler}
             className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white transition-colors cursor-pointer"
             aria-label="Toggle theme"
           >

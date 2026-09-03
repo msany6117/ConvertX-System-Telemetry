@@ -41,9 +41,17 @@ import { TOOLS_LIST } from './data/tools';
 export default function App() {
   const [language, setLanguage] = useState<Language>('en');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [currentRoute, setCurrentRoute] = useState<string>(() => {
+  
+  const getInitialRoute = (): string => {
+    if (typeof window === 'undefined') return '/';
+    const hash = window.location.hash.replace(/^#\/?/, '/');
+    if (hash && hash !== '/') {
+      return hash.startsWith('/') ? hash : `/${hash}`;
+    }
     return window.location.pathname || '/';
-  });
+  };
+
+  const [currentRoute, setCurrentRoute] = useState<string>(getInitialRoute);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
 
   const t = language === 'bn' ? bn : en;
@@ -57,19 +65,34 @@ export default function App() {
     }
   }, [theme]);
 
-  // Handle browser back/forward navigation
+  // Handle browser back/forward navigation and hash change
   useEffect(() => {
-    const handlePopState = () => {
+    const handleLocationChange = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '/');
+      if (hash && hash !== '/') {
+        setCurrentRoute(hash.startsWith('/') ? hash : `/${hash}`);
+        return;
+      }
       setCurrentRoute(window.location.pathname || '/');
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
   }, []);
 
   const navigateTo = (route: string) => {
-    if (route !== currentRoute) {
-      window.history.pushState({}, '', route);
-      setCurrentRoute(route);
+    const normalized = route.startsWith('/') ? route : `/${route}`;
+    if (normalized !== currentRoute) {
+      try {
+        window.history.pushState({ route: normalized }, '', normalized);
+      } catch {
+        window.location.hash = normalized;
+      }
+      setCurrentRoute(normalized);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -226,7 +249,12 @@ export default function App() {
     }
 
     // INDIVIDUAL SPECIALTY TOOLS
-    if (currentRoute === '/image-resizer' || currentRoute === '/tools/image-resizer') {
+    if (
+      currentRoute === '/image-resizer' ||
+      currentRoute === '/image/resizer' ||
+      currentRoute === '/image/image-resizer' ||
+      currentRoute === '/tools/image-resizer'
+    ) {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <div className="text-center max-w-xl mx-auto space-y-2">
@@ -240,7 +268,12 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/image-crop' || currentRoute === '/tools/image-crop') {
+    if (
+      currentRoute === '/image-crop' ||
+      currentRoute === '/image/crop' ||
+      currentRoute === '/image/image-crop' ||
+      currentRoute === '/tools/image-crop'
+    ) {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <div className="text-center max-w-xl mx-auto space-y-2">
@@ -257,6 +290,7 @@ export default function App() {
     if (
       currentRoute === '/merge-pdf' ||
       currentRoute === '/pdf/merge' ||
+      currentRoute === '/pdf/merge-pdf' ||
       currentRoute === '/tools/merge-pdf'
     ) {
       return (
@@ -269,6 +303,7 @@ export default function App() {
     if (
       currentRoute === '/split-pdf' ||
       currentRoute === '/pdf/split' ||
+      currentRoute === '/pdf/split-pdf' ||
       currentRoute === '/tools/split-pdf'
     ) {
       return (
@@ -281,6 +316,8 @@ export default function App() {
     if (
       currentRoute === '/compress-pdf' ||
       currentRoute === '/pdf/compress' ||
+      currentRoute === '/pdf/compress-pdf' ||
+      currentRoute === '/compress/pdf' ||
       currentRoute === '/tools/compress-pdf' ||
       currentRoute === '/pdf-compressor'
     ) {
@@ -294,6 +331,7 @@ export default function App() {
     if (
       currentRoute === '/rotate-pdf' ||
       currentRoute === '/pdf/rotate' ||
+      currentRoute === '/pdf/rotate-pdf' ||
       currentRoute === '/tools/rotate-pdf'
     ) {
       return (
@@ -303,7 +341,11 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/units' || currentRoute === '/tools/unit-converter') {
+    if (
+      currentRoute === '/units' ||
+      currentRoute === '/unit-converter' ||
+      currentRoute === '/tools/unit-converter'
+    ) {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <UnitConverterView />
@@ -311,7 +353,11 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/time' || currentRoute === '/tools/timezone-converter') {
+    if (
+      currentRoute === '/time' ||
+      currentRoute === '/timezone-converter' ||
+      currentRoute === '/tools/timezone-converter'
+    ) {
       return (
         <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
           <TimeZoneConverterView />
@@ -319,17 +365,25 @@ export default function App() {
       );
     }
 
-    // Match dedicated format tool route, e.g. /heic-to-jpg, /image/heic-to-jpg, /mp4-to-mp3, etc.
-    const normalizedPath = currentRoute.replace(/^\/(image|video|audio|pdf|documents|compress|tools)/, '');
-    const formatToolMatch = TOOLS_LIST.find(
-      (t) =>
-        t.route === currentRoute ||
-        `/tools${t.route}` === currentRoute ||
-        (normalizedPath && t.route === normalizedPath) ||
-        (normalizedPath && t.route === `/${normalizedPath.replace(/^\//, '')}`)
-    );
+    // Match dedicated format tool route, e.g. /image/heic-to-jpg, /heic-to-jpg, /video/mp4-to-mp3, etc.
+    const trimmedPath = currentRoute.replace(/\/$/, '');
+    const cleanSubPath = trimmedPath.replace(/^\/(image|video|audio|pdf|documents|compress|tools)\//, '/');
+    const slugOnly = trimmedPath.split('/').filter(Boolean).pop() || '';
 
-    if (formatToolMatch && currentRoute !== '/') {
+    const formatToolMatch = TOOLS_LIST.find((t) => {
+      const toolRoute = t.route.replace(/\/$/, '');
+      const toolSlug = toolRoute.replace(/^\//, '');
+      return (
+        t.route === trimmedPath ||
+        `/tools${t.route}` === trimmedPath ||
+        toolRoute === cleanSubPath ||
+        toolSlug === slugOnly ||
+        toolSlug === cleanSubPath.replace(/^\//, '') ||
+        (t.id && (t.id === slugOnly || t.id === cleanSubPath.replace(/^\//, '')))
+      );
+    });
+
+    if (formatToolMatch && trimmedPath !== '' && trimmedPath !== '/') {
       return (
         <DedicatedToolPage
           tool={formatToolMatch}
@@ -586,10 +640,14 @@ export default function App() {
     <div className="min-h-screen bg-slate-50/50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       {/* Top Navigation */}
       <Navbar
+        currentRoute={currentRoute}
+        navigate={navigateTo}
         language={language}
         theme={theme}
+        setLanguage={setLanguage}
         onLanguageChange={setLanguage}
         onThemeToggle={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+        setTheme={setTheme}
         onNavigate={navigateTo}
         onOpenSearch={() => setIsSearchOpen(true)}
       />

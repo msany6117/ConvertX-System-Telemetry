@@ -160,7 +160,11 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         category,
         previewUrl,
         supportedTargets,
-        targetFormat: defaultTarget,
+        targetFormat:
+          presetTargetFormat &&
+          (supportedTargets.includes(presetTargetFormat) || presetTargetFormat === 'compress')
+            ? presetTargetFormat
+            : defaultTarget,
         options: {},
         status: 'ready',
         progress: 0,
