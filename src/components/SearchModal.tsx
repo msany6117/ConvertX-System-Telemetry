@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, ArrowRight, Layers } from 'lucide-react';
+import { Search, X, ArrowRight, Command } from 'lucide-react';
 import { TOOLS_LIST } from '../data/tools';
-import { ToolItem } from '../types';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -15,32 +14,46 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   onSelectTool,
 }) => {
   const [query, setQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
+      setSelectedIndex(0);
     } else {
       setQuery('');
     }
   }, [isOpen]);
 
-  // Keyboard shortcut ⌘K / Ctrl+K & Escape
+  // Keyboard navigation & Shortcuts (⌘K / Ctrl+K, Escape, ArrowUp, ArrowDown, Enter)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         if (isOpen) onClose();
       }
-      if (e.key === 'Escape' && isOpen) {
+      if (!isOpen) return;
+
+      if (e.key === 'Escape') {
         onClose();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % filtered.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filtered[selectedIndex]) {
+          handleSelect(filtered[selectedIndex].route);
+        }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [isOpen, onClose, selectedIndex]);
 
   const filtered = query.trim()
     ? TOOLS_LIST.filter((tool) => {
@@ -52,7 +65,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
           tool.outputFormats.some((f) => f.includes(q)) ||
           tool.category.includes(q)
         );
-      })
+      }).slice(0, 10)
     : TOOLS_LIST.slice(0, 8);
 
   const handleSelect = (route: string) => {
@@ -60,79 +73,97 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
-        {/* Search Input Box */}
-        <div className="flex items-center border-b border-slate-100 px-4 dark:border-slate-800">
-          <Search className="h-5 w-5 text-slate-400 shrink-0" />
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 p-4">
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs transition-opacity"
+        onClick={onClose}
+      />
+
+      {/* Palette Dialog */}
+      <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 z-10 transition-all">
+        {/* Search Input Bar */}
+        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 dark:border-slate-800">
+          <Search className="h-4 w-4 text-slate-400 shrink-0" />
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search tools, formats (e.g. jpg to webp, compress video)..."
+            placeholder="Search tools... (e.g. PDF to Word, Compress PDF, JPG to PNG, MP4 to MP3)"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-transparent px-3 py-4 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIndex(0);
+            }}
+            className="flex-1 bg-transparent text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white"
           />
-          {query && (
-            <button onClick={() => setQuery('')} className="p-1 text-slate-400 hover:text-slate-600">
-              <X className="h-4 w-4" />
+          {query ? (
+            <button
+              onClick={() => setQuery('')}
+              className="rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X className="h-3.5 w-3.5" />
             </button>
+          ) : (
+            <kbd className="hidden sm:inline-flex rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:border-slate-700 dark:bg-slate-800">
+              ESC
+            </kbd>
           )}
-          <button
-            onClick={onClose}
-            className="ml-2 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400"
-          >
-            ESC
-          </button>
         </div>
 
         {/* Results List */}
-        <div className="max-h-80 overflow-y-auto p-2">
+        <div className="max-h-80 overflow-y-auto p-2 space-y-1">
           {filtered.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-400">
-              No matching tools found for "{query}". Try "jpg", "mp4", "pdf", or "compress".
+            <div className="py-8 text-center text-xs text-slate-400">
+              No matching tools found for "{query}".
             </div>
           ) : (
-            <div className="space-y-1">
-              {filtered.map((tool) => (
+            filtered.map((tool, idx) => {
+              const isSelected = selectedIndex === idx;
+
+              return (
                 <button
                   key={tool.id}
                   onClick={() => handleSelect(tool.route)}
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 group cursor-pointer"
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                      : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60'
+                  }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
-                      <Layers className="h-3.5 w-3.5" />
+                  <div className="min-w-0 pr-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold">{tool.name}</span>
+                      <span className="text-[10px] uppercase font-mono text-slate-400 dark:text-slate-500">
+                        {tool.category}
+                      </span>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-slate-800 dark:text-white truncate">
-                          {tool.name}
-                        </span>
-                        {tool.badge && (
-                          <span className="rounded bg-blue-50 dark:bg-blue-950 px-1 py-0.2 text-[9px] font-bold text-blue-600 dark:text-blue-400">
-                            {tool.badge}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-400 truncate max-w-sm">
-                        {tool.description}
-                      </p>
-                    </div>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                      {tool.description}
+                    </p>
                   </div>
-
-                  <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-transform group-hover:translate-x-0.5" />
+                  <ArrowRight
+                    className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+                      isSelected ? 'text-slate-900 dark:text-white translate-x-0.5' : 'text-slate-300 dark:text-slate-600'
+                    }`}
+                  />
                 </button>
-              ))}
-            </div>
+              );
+            })
           )}
         </div>
 
-        {/* Footer info */}
-        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-400 dark:border-slate-800 dark:bg-slate-900/60">
-          <span>Search ConvertX open-source utilities</span>
-          <span>Press ESC to exit</span>
+        {/* Bottom Keyboard Hints */}
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-[10px] font-medium text-slate-400 dark:border-slate-800 dark:bg-slate-950/60">
+          <div className="flex items-center gap-3">
+            <span>↑↓ Navigate</span>
+            <span>↵ Select</span>
+            <span>ESC Close</span>
+          </div>
+          <span>ConvertX Command Palette</span>
         </div>
       </div>
     </div>

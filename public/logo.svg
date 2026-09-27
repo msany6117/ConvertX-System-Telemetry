@@ -1,30 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'>
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4f46e5" />
-      <stop offset="50%" stop-color="#7c3aed" />
-      <stop offset="100%" stop-color="#9333ea" />
+    <!-- Gradient for Top-Left to Bottom-Right Stroke -->
+    <linearGradient id='gradBack' x1='15%' y1='15%' x2='85%' y2='85%'>
+      <stop offset='0%' stop-color='#00d2ff' />
+      <stop offset='45%' stop-color='#2563eb' />
+      <stop offset='100%' stop-color='#7c3aed' />
     </linearGradient>
-    <linearGradient id="glassHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.3" />
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+
+    <!-- Gradient for Bottom-Left to Top-Right Arrow Stroke -->
+    <linearGradient id='gradFront' x1='15%' y1='85%' x2='85%' y2='15%'>
+      <stop offset='0%' stop-color='#00d2ff' />
+      <stop offset='42%' stop-color='#2563eb' />
+      <stop offset='78%' stop-color='#6366f1' />
+      <stop offset='100%' stop-color='#8b5cf6' />
     </linearGradient>
+
+    <!-- Subtle drop shadow on the crossing point -->
+    <filter id='overlapShadow' x='-20%' y='-20%' width='150%' height='150%'>
+      <feDropShadow dx='-8' dy='8' stdDeviation='10' flood-color='#050d26' flood-opacity='0.28' />
+    </filter>
   </defs>
-  <!-- Rounded squircle base with shadow -->
-  <rect width="48" height="48" rx="14" fill="url(#bgGrad)" />
-  <rect width="48" height="48" rx="14" fill="url(#glassHighlight)" />
-  <rect x="0.5" y="0.5" width="47" height="47" rx="13.5" stroke="#ffffff" stroke-opacity="0.25" fill="none" />
-  
-  <!-- Intertwined 'C' Loop & 'X' Interchange Mark -->
-  <g stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Top-left C curve -->
-    <path d="M12 28V18a6 6 0 0 1 6-6h4" />
-    <path d="M16 23.5L21.5 28L16 32.5" />
-    <!-- Bottom-right loop -->
-    <path d="M36 20v10a6 6 0 0 1-6 6h-4" />
-    <path d="M32 24.5L26.5 20L32 15.5" />
-    <!-- Interchange dynamic cross 'X' center -->
-    <path d="M20 20L28 28" />
-    <path d="M28 20L20 28" />
+
+  <!-- 1. Background Stroke: Top-Left to Bottom-Right (rotated -45 deg) -->
+  <rect x='198' y='46' width='116' height='420' rx='58' transform='rotate(-45 256 256)' fill='url(#gradBack)' />
+
+  <!-- 2. Foreground Arrow: Bottom-Left to Top-Right (rotated +45 deg) -->
+  <g transform='rotate(45 256 256)' filter='url(#overlapShadow)'>
+    <path d='
+      M 198 408
+      C 198 440, 224 466, 256 466
+      C 288 466, 314 440, 314 408
+      L 314 200
+      L 366 200
+      C 378 200, 384 185, 376 177
+      L 265 52
+      C 260 46, 252 46, 247 52
+      L 136 177
+      C 128 185, 134 200, 146 200
+      L 198 200
+      Z
+    ' fill='url(#gradFront)' />
   </g>
 </svg>

@@ -4,8 +4,9 @@ import { UploadedFileItem } from '../types';
 
 interface ConversionSettingsModalProps {
   item: UploadedFileItem | null;
+  isOpen?: boolean;
   onClose: () => void;
-  onSave: (itemId: string, updatedOptions: Record<string, any>) => void;
+  onSave: ((options: Record<string, any>) => void) | ((itemId: string, updatedOptions: Record<string, any>) => void);
 }
 
 export const ConversionSettingsModal: React.FC<ConversionSettingsModalProps> = ({
@@ -18,7 +19,11 @@ export const ConversionSettingsModal: React.FC<ConversionSettingsModalProps> = (
   const [options, setOptions] = useState<Record<string, any>>(item.options || {});
 
   const handleSave = () => {
-    onSave(item.id, options);
+    if (onSave.length === 1) {
+      (onSave as (opts: Record<string, any>) => void)(options);
+    } else {
+      (onSave as (id: string, opts: Record<string, any>) => void)(item.id, options);
+    }
     onClose();
   };
 

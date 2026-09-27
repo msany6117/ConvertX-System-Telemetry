@@ -9,21 +9,16 @@ import {
   Settings,
   ArrowRight,
   Link as LinkIcon,
-  Loader2,
-  FolderArchive,
   RefreshCw,
   Plus,
   Sparkles,
-  Cpu,
-  Server,
-  ShieldCheck,
   ChevronDown,
-  Cloud,
   X,
+  Clipboard,
+  Shield,
+  Layers,
 } from 'lucide-react';
 import { UploadedFileItem, Language } from '../types';
-import { en } from '../locales/en';
-import { bn } from '../locales/bn';
 import { ConversionSettingsModal } from './ConversionSettingsModal';
 import { CloudImportModal, CloudSource } from './CloudImportModal';
 import { canConvertClientSide, convertClientSide } from '../utils/clientEngine';
@@ -34,14 +29,15 @@ interface UniversalUploaderProps {
   language: Language;
   presetTargetFormat?: string;
   presetCategory?: string;
+  onFilesChanged?: (count: number) => void;
 }
 
 export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
   language,
   presetTargetFormat,
   presetCategory,
+  onFilesChanged,
 }) => {
-  const t = language === 'bn' ? bn : en;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [items, setItems] = useState<UploadedFileItem[]>([]);
@@ -49,32 +45,31 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
   const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [cloudSource, setCloudSource] = useState<CloudSource>('gdrive');
-  const [isCloudDropdownOpen, setIsCloudDropdownOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [urlLoading, setUrlLoading] = useState(false);
-  const [urlError, setUrlError] = useState('');
   const [activeSettingsItem, setActiveSettingsItem] = useState<UploadedFileItem | null>(null);
   const [isConvertingAll, setIsConvertingAll] = useState(false);
   const [batchTarget, setBatchTarget] = useState<string>('');
   const [registry, setRegistry] = useState<Record<string, any>>({});
-  const [engineMode, setEngineMode] = useState<'auto' | 'wasm' | 'server'>('auto');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [openSelectorId, setOpenSelectorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (onFilesChanged) onFilesChanged(items.length);
+  }, [items, onFilesChanged]);
 
   // Fetch registry formats on mount
   useEffect(() => {
     fetch('/api/registry')
       .then((res) => {
-        if (!res.ok) throw new Error('Registry endpoint unavailable');
+        if (!res.ok) throw new Error('Registry unavailable');
         return res.json();
       })
       .then((data) => {
-        if (data.formats) {
-          setRegistry(data.formats);
-        }
+        if (data.formats) setRegistry(data.formats);
       })
       .catch((e) => {
-        // Safe in standalone / zero-backend mode
-        console.log('Running in zero-backend / client mode (Server registry skipped):', e.message || e);
+        console.log('Running in zero-backend / client mode:', e.message || e);
       });
   }, []);
 
@@ -100,34 +95,27 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
       webp: ['jpg', 'png', 'avif', 'pdf'],
       mp4: ['mp3', 'gif', 'webm', 'mov', 'wav'],
       mov: ['mp4', 'mp3', 'gif', 'webm'],
-      webm: ['mp4', 'gif', 'mp3'],
-      mp3: ['wav', 'aac', 'flac', 'ogg'],
-      wav: ['mp3', 'aac', 'flac', 'ogg'],
-      pdf: ['jpg', 'png', 'compress', 'split', 'rotate'],
+      webm: ['mp4', 'mp3', 'gif'],
+      pdf: ['jpg', 'png', 'split', 'compress'],
       docx: ['pdf', 'txt', 'html'],
-      csv: ['xlsx', 'txt'],
-      xlsx: ['csv', 'txt'],
-      zip: ['tar'],
+      xlsx: ['csv', 'pdf'],
+      csv: ['xlsx', 'json'],
+      mp3: ['wav', 'aac', 'flac', 'ogg'],
+      wav: ['mp3', 'flac', 'ogg'],
+      heic: ['jpg', 'png', 'webp', 'pdf'],
+      heif: ['jpg', 'png', 'webp', 'pdf'],
     };
 
-    const targets = reg?.targetFormats || defaultTargetsMap[ext] || ['zip'];
-    const cat = reg?.category || (
-      ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif', 'bmp'].includes(ext)
-        ? 'image'
-        : ['mp4', 'mov', 'webm', 'mkv', 'avi'].includes(ext)
-        ? 'video'
-        : ['mp3', 'wav', 'aac', 'flac', 'ogg'].includes(ext)
-        ? 'audio'
-        : ext === 'pdf'
-        ? 'pdf'
-        : 'document'
-    );
+    let targets = reg?.targetFormats || defaultTargetsMap[ext] || ['pdf', 'jpg', 'png', 'webp'];
+    if (presetTargetFormat) {
+      targets = [presetTargetFormat, ...targets.filter((t) => t !== presetTargetFormat)];
+    }
 
     return {
       ext,
-      category: cat,
+      category: reg?.category || presetCategory || 'other',
       supportedTargets: targets,
-      defaultTarget: presetTargetFormat || targets[0] || 'zip',
+      defaultTarget: targets[0] || 'pdf',
     };
   };
 
@@ -159,24 +147,20 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         originalName: file.name,
         size: file.size,
         extension: ext,
-        category,
-        previewUrl,
+        category: category as any,
         supportedTargets,
-        targetFormat:
-          presetTargetFormat &&
-          (supportedTargets.includes(presetTargetFormat) || presetTargetFormat === 'compress')
-            ? presetTargetFormat
-            : defaultTarget,
+        targetFormat: defaultTarget,
         options: {},
         status: 'ready',
         progress: 0,
+        previewUrl,
       });
     }
 
     if (newItems.length > 0) {
       setItems((prev) => [...prev, ...newItems]);
-      if (!batchTarget && newItems[0].supportedTargets.length > 0) {
-        setBatchTarget(presetTargetFormat || newItems[0].targetFormat);
+      if (newItems.length > 0 && !batchTarget) {
+        setBatchTarget(newItems[0].targetFormat);
       }
     }
   };
@@ -187,7 +171,8 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
     setIsDragging(true);
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
     setIsDragging(false);
   };
 
@@ -199,63 +184,70 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
     }
   };
 
-  // From URL submission
-  const handleUrlSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Clipboard paste handler
+  const handlePaste = async () => {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        for (const type of item.types) {
+          if (type.startsWith('image/') || type === 'application/pdf') {
+            const blob = await item.getType(type);
+            const ext = type.split('/')[1] || 'bin';
+            const file = new File([blob], `pasted_file_${Date.now()}.${ext}`, { type });
+            handleAddFiles([file]);
+            return;
+          }
+        }
+      }
+      setToastMessage('No supported image or document found in clipboard.');
+    } catch {
+      setToastMessage('Clipboard access was blocked or is not supported.');
+    }
+  };
+
+  // URL Import
+  const handleUrlImport = async () => {
     if (!urlInput.trim()) return;
-
     setUrlLoading(true);
-    setUrlError('');
-
     try {
       const res = await fetch('/api/upload/url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlInput.trim() }),
+        body: JSON.stringify({ url: urlInput }),
       });
-
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to download from URL.');
-      }
+      if (!res.ok) throw new Error(data.error || 'Failed to download from URL.');
 
       const fileInfo = data.file;
-      const { ext, category, supportedTargets, defaultTarget } = getFormatDetails(fileInfo.originalName);
-
-      const newItem: UploadedFileItem = {
-        id: Math.random().toString(36).substring(2, 9),
-        fileId: fileInfo.fileId,
-        originalName: fileInfo.originalName,
-        size: fileInfo.size,
-        extension: ext,
-        category,
-        supportedTargets,
-        targetFormat: defaultTarget,
-        options: {},
-        status: 'ready',
-        progress: 0,
-      };
-
-      setItems((prev) => [...prev, newItem]);
+      setItems((prev) => [
+        ...prev,
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          fileId: fileInfo.fileId,
+          originalName: fileInfo.originalName,
+          size: fileInfo.size,
+          extension: fileInfo.extension,
+          category: fileInfo.category,
+          supportedTargets: fileInfo.supportedTargets,
+          targetFormat: fileInfo.defaultTarget,
+          options: {},
+          status: 'ready',
+          progress: 0,
+        },
+      ]);
       setUrlInput('');
       setIsUrlModalOpen(false);
     } catch (err: any) {
-      setUrlError(err.message || 'Error importing URL.');
+      setToastMessage(err.message || 'Error importing URL');
     } finally {
       setUrlLoading(false);
     }
   };
 
   // Remove single item
-  const handleRemoveItem = async (itemId: string) => {
+  const removeItem = (itemId: string) => {
     const target = items.find((i) => i.id === itemId);
-    if (target?.jobId) {
-      // Optional delete call
-      fetch(`/api/files/${target.jobId}`, { method: 'DELETE' }).catch(() => {});
-    }
-    if (target?.previewUrl) {
-      URL.revokeObjectURL(target.previewUrl);
-    }
+    if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
     setItems((prev) => prev.filter((i) => i.id !== itemId));
   };
 
@@ -264,17 +256,13 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
 
-    // Check if item can be converted client-side with WASM/Canvas/JS
     const isClientCapable = !!item.file && canConvertClientSide(item.extension, item.targetFormat);
-    const preferClient = engineMode === 'wasm' || (engineMode === 'auto' && isClientCapable);
 
-    // 1. CLIENT-SIDE WASM / BROWSER CONVERSION
-    if (preferClient && item.file) {
+    // 1. Client-Side WASM / Canvas conversion
+    if (isClientCapable && item.file) {
       setItems((prev) =>
         prev.map((i) =>
-          i.id === itemId
-            ? { ...i, status: 'processing', progress: 15, engineMode: 'wasm' }
-            : i
+          i.id === itemId ? { ...i, status: 'processing', progress: 20, engineMode: 'wasm' } : i
         )
       );
 
@@ -293,9 +281,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         const downloadUrl = URL.createObjectURL(result.blob);
         const outputSize = result.outputSize;
         const savedPercent =
-          item.size > outputSize
-            ? Math.round(((item.size - outputSize) / item.size) * 100)
-            : 0;
+          item.size > outputSize ? Math.round(((item.size - outputSize) / item.size) * 100) : 0;
 
         setItems((prev) =>
           prev.map((i) =>
@@ -315,7 +301,6 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
           )
         );
 
-        // Record in LocalStorage History
         saveHistoryRecord({
           id: item.id,
           originalName: item.originalName,
@@ -331,33 +316,18 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
           mode: 'wasm',
           category: item.category,
         });
-
         return;
-      } catch (wasmErr: any) {
-        console.warn('WASM client conversion encountered an issue:', wasmErr);
-        if (engineMode === 'wasm') {
-          setItems((prev) =>
-            prev.map((i) =>
-              i.id === itemId
-                ? {
-                    ...i,
-                    status: 'failed',
-                    errorMessage: wasmErr.message || 'WASM conversion failed.',
-                  }
-                : i
-            )
-          );
-          return;
-        }
-        // If in 'auto' mode, fall through to server fallback
+      } catch (wasmErr) {
+        console.warn('WASM client conversion issue, using server fallback:', wasmErr);
       }
     }
 
-    // 2. SERVER FALLBACK CONVERSION
+    // 2. Server Fallback conversion
     let currentFileId = item.fileId;
-
     setItems((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, status: 'uploading', progress: 20, engineMode: 'server' } : i))
+      prev.map((i) =>
+        i.id === itemId ? { ...i, status: 'uploading', progress: 20, engineMode: 'server' } : i
+      )
     );
 
     try {
@@ -371,23 +341,15 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         });
 
         const uploadData = await uploadRes.json();
-        if (!uploadRes.ok) {
-          throw new Error(uploadData.error || 'Upload failed.');
-        }
-
+        if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed.');
         currentFileId = uploadData.files[0].fileId;
       }
 
-      if (!currentFileId) {
-        throw new Error('No uploaded file reference found.');
-      }
+      if (!currentFileId) throw new Error('No uploaded file reference found.');
 
-      // Submit conversion job
       setItems((prev) =>
         prev.map((i) =>
-          i.id === itemId
-            ? { ...i, fileId: currentFileId, status: 'queued', progress: 40 }
-            : i
+          i.id === itemId ? { ...i, fileId: currentFileId, status: 'queued', progress: 40 } : i
         )
       );
 
@@ -406,13 +368,9 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
       });
 
       const jobData = await jobRes.json();
-      if (!jobRes.ok) {
-        throw new Error(jobData.error || 'Failed to initialize conversion job.');
-      }
+      if (!jobRes.ok) throw new Error(jobData.error || 'Failed to initialize conversion job.');
 
       const jobId = jobData.jobs[0].jobId;
-
-      // Poll for completion
       pollJobStatus(itemId, jobId, item);
     } catch (err: any) {
       setItems((prev) =>
@@ -421,7 +379,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
             ? {
                 ...i,
                 status: 'failed',
-                errorMessage: err.message || 'Conversion encountered an error.',
+                errorMessage: err.message || "We couldn't process this file.",
               }
             : i
         )
@@ -429,7 +387,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
     }
   };
 
-  // Polling helper for server jobs
+  // Poll server job
   const pollJobStatus = (itemId: string, jobId: string, originalItem: UploadedFileItem) => {
     const interval = setInterval(async () => {
       try {
@@ -440,7 +398,6 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         }
 
         const data = await res.json();
-
         if (data.status === 'COMPLETED') {
           clearInterval(interval);
           const outSize = data.outputSize || originalItem.size;
@@ -452,7 +409,6 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
               i.id === itemId
                 ? {
                     ...i,
-                    jobId,
                     status: 'completed',
                     progress: 100,
                     outputFilename: outName,
@@ -465,7 +421,6 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
             )
           );
 
-          // Save to LocalStorage History
           saveHistoryRecord({
             id: originalItem.id,
             originalName: originalItem.originalName,
@@ -488,9 +443,8 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
               i.id === itemId
                 ? {
                     ...i,
-                    jobId,
                     status: 'failed',
-                    errorMessage: data.errorMessage || 'Conversion failed.',
+                    errorMessage: data.errorMessage || "We couldn't process this file.",
                   }
                 : i
             )
@@ -498,24 +452,17 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         } else {
           setItems((prev) =>
             prev.map((i) =>
-              i.id === itemId
-                ? {
-                    ...i,
-                    jobId,
-                    status: 'processing',
-                    progress: Math.max(i.progress, data.progress || 50),
-                  }
-                : i
+              i.id === itemId ? { ...i, status: 'processing', progress: data.progress || 50 } : i
             )
           );
         }
-      } catch (e) {
-        console.warn('Poll error:', e);
+      } catch {
+        clearInterval(interval);
       }
     }, 1000);
   };
 
-  // Convert All button
+  // Convert all items
   const handleConvertAll = async () => {
     setIsConvertingAll(true);
     const readyItems = items.filter((i) => i.status === 'ready' || i.status === 'failed');
@@ -525,60 +472,25 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
     setIsConvertingAll(false);
   };
 
-  // Download All as ZIP (Zero-Cost In-Browser JSZip or Server Fallback)
+  // Download all as ZIP
   const handleDownloadAllZip = async () => {
     const completedItems = items.filter((i) => i.status === 'completed');
     if (completedItems.length === 0) return;
 
-    // Check if items have client blobs or can be zipped in browser
-    const hasClientBlobs = completedItems.some((i) => !!i.outputBlob);
-    if (hasClientBlobs || completedItems.every((i) => !!i.downloadUrl)) {
-      try {
-        const zip = new JSZip();
-        for (const item of completedItems) {
-          const fname = item.outputFilename || `${item.originalName}.${item.targetFormat}`;
-          if (item.outputBlob) {
-            zip.file(fname, item.outputBlob);
-          } else if (item.downloadUrl) {
-            const resp = await fetch(item.downloadUrl);
-            const blob = await resp.blob();
-            zip.file(fname, blob);
-          }
-        }
-
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const url = window.URL.createObjectURL(zipBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'ConvertX_Batch_Export.zip';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        return;
-      } catch (err) {
-        console.warn('In-browser ZIP packaging failed, falling back to server:', err);
-      }
-    }
-
-    // Fallback: Server-side ZIP endpoint
-    const completedJobIds = completedItems
-      .filter((i) => !!i.jobId)
-      .map((i) => i.jobId as string);
-
-    if (completedJobIds.length === 0) return;
-
     try {
-      const res = await fetch('/api/download-zip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobIds: completedJobIds }),
-      });
+      const zip = new JSZip();
+      for (const item of completedItems) {
+        if (item.outputBlob) {
+          zip.file(item.outputFilename || 'converted_file', item.outputBlob);
+        } else if (item.downloadUrl) {
+          const resp = await fetch(item.downloadUrl);
+          const blob = await resp.blob();
+          zip.file(item.outputFilename || 'converted_file', blob);
+        }
+      }
 
-      if (!res.ok) throw new Error('ZIP download failed.');
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = window.URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = 'ConvertX_Export.zip';
@@ -591,32 +503,32 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
     }
   };
 
-  // Batch format change
-  const handleBatchFormatChange = (fmt: string) => {
-    setBatchTarget(fmt);
-    setItems((prev) =>
-      prev.map((i) => (i.status === 'ready' ? { ...i, targetFormat: fmt } : i))
-    );
+  // Determine current workflow step
+  const getWorkflowStep = () => {
+    if (items.length === 0) return 1; // UPLOAD
+    if (items.some((i) => i.status === 'processing' || i.status === 'uploading' || i.status === 'queued')) return 3; // CONVERT
+    if (items.every((i) => i.status === 'completed')) return 4; // DOWNLOAD
+    return 2; // CONFIGURE
   };
 
+  const currentStep = getWorkflowStep();
   const hasCompletedItems = items.some((i) => i.status === 'completed');
   const hasReadyItems = items.some((i) => i.status === 'ready');
 
   return (
-    <div className="w-full">
-      {/* Non-intrusive warning/notice toast */}
+    <div className="w-full space-y-6">
+      {/* Toast Notification */}
       {toastMessage && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-xs font-semibold text-amber-900 shadow-sm backdrop-blur-md dark:border-amber-800/60 dark:bg-amber-950/70 dark:text-amber-200 animate-in fade-in slide-in-from-top-2">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 shadow-xs dark:border-amber-800/60 dark:bg-amber-950/70 dark:text-amber-200">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <span>{toastMessage}</span>
           </div>
           <button
             onClick={() => setToastMessage(null)}
-            className="rounded-lg p-1 text-amber-700 hover:bg-amber-200/50 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
-            aria-label="Dismiss notification"
+            className="rounded-lg p-1 text-amber-700 hover:bg-amber-200/50 dark:text-amber-300 dark:hover:bg-amber-900/50 cursor-pointer"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
@@ -633,494 +545,428 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
         className="hidden"
       />
 
-      {/* DRAG & DROP HERO CARD */}
-      <div
-        id="universal-dropzone"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`group relative overflow-hidden rounded-3xl border-2 border-dashed p-8 md:p-12 text-center transition-all duration-300 backdrop-blur-md ${
-          isDragging
-            ? 'border-indigo-500 bg-gradient-to-br from-indigo-500/10 via-purple-500/15 to-pink-500/10 scale-[1.015] shadow-2xl shadow-indigo-500/20 ring-4 ring-indigo-500/20 animate-pulse'
-            : 'border-slate-300/80 bg-white/75 hover:border-indigo-400/90 hover:bg-slate-50/90 hover:shadow-xl hover:shadow-indigo-500/5 dark:border-slate-700/80 dark:bg-slate-900/60 dark:hover:border-indigo-500/60 shadow-sm'
-        }`}
-      >
-        {/* Ambient background glow accents */}
-        <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-gradient-to-br from-indigo-500/10 to-purple-500/0 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-gradient-to-tr from-pink-500/10 to-indigo-500/0 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 mx-auto flex max-w-xl flex-col items-center">
-          {/* Cloud Icon */}
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-500/15 via-purple-500/15 to-pink-500/15 text-indigo-600 dark:text-indigo-400 shadow-inner ring-1 ring-indigo-500/20 transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1">
-            <UploadCloud className="h-8 w-8 transition-transform duration-300 group-hover:scale-105" />
-          </div>
-
-          <h3 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-            {t.hero.dropTitle}
-          </h3>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {t.hero.dropSubtitle}
-          </p>
-
-          {/* Action buttons: Device & Cloud Providers */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
-            {/* Primary split button */}
-            <div className="relative inline-flex rounded-xl shadow-lg shadow-indigo-500/25 transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]">
-              <button
-                id="choose-files-btn"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 rounded-l-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-6 py-3 text-sm font-bold text-white transition-all cursor-pointer"
-              >
-                <Plus className="h-4 w-4" />
-                <span>{t.hero.fromDevice}</span>
-              </button>
-              <button
-                id="choose-files-dropdown-btn"
-                onClick={() => setIsCloudDropdownOpen(!isCloudDropdownOpen)}
-                className="flex items-center justify-center rounded-r-xl border-l border-indigo-400/40 bg-purple-600 hover:bg-purple-700 px-3 py-3 text-white transition-all cursor-pointer"
-                title="Cloud storage options"
-              >
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isCloudDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Cloud Dropdown Menu */}
-              {isCloudDropdownOpen && (
-                <div
-                  className="absolute left-0 top-full mt-2 z-30 w-56 rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-xl p-1.5 shadow-2xl dark:border-slate-800/90 dark:bg-slate-900/95 text-left animate-in fade-in zoom-in-95 duration-100"
-                  onClick={() => setIsCloudDropdownOpen(false)}
-                >
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  >
-                    <span>💻</span>
-                    <span>From Device</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCloudSource('gdrive');
-                      setIsCloudModalOpen(true);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  >
-                    <span>📁</span>
-                    <span>From Google Drive</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCloudSource('dropbox');
-                      setIsCloudModalOpen(true);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  >
-                    <span>📦</span>
-                    <span>From Dropbox</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setCloudSource('onedrive');
-                      setIsCloudModalOpen(true);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  >
-                    <span>☁️</span>
-                    <span>From OneDrive</span>
-                  </button>
-                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-                  <button
-                    onClick={() => {
-                      setCloudSource('url');
-                      setIsCloudModalOpen(true);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  >
-                    <LinkIcon className="h-3.5 w-3.5 text-slate-400" />
-                    <span>By Web URL</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Direct Cloud Buttons with soft hover scale */}
-            <button
-              id="from-gdrive-btn"
-              onClick={() => {
-                setCloudSource('gdrive');
-                setIsCloudModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/90 dark:bg-slate-800/90 px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-white hover:border-indigo-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer backdrop-blur-xs"
-            >
-              <span>📁</span>
-              <span className="hidden sm:inline">Google Drive</span>
-            </button>
-
-            <button
-              id="from-dropbox-btn"
-              onClick={() => {
-                setCloudSource('dropbox');
-                setIsCloudModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/90 dark:bg-slate-800/90 px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-white hover:border-indigo-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer backdrop-blur-xs"
-            >
-              <span>📦</span>
-              <span className="hidden sm:inline">Dropbox</span>
-            </button>
-
-            <button
-              id="from-onedrive-btn"
-              onClick={() => {
-                setCloudSource('onedrive');
-                setIsCloudModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/90 dark:bg-slate-800/90 px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-white hover:border-indigo-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer backdrop-blur-xs"
-            >
-              <span>☁️</span>
-              <span className="hidden sm:inline">OneDrive</span>
-            </button>
-
-            <button
-              id="from-url-btn"
-              onClick={() => {
-                setCloudSource('url');
-                setIsCloudModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white/90 dark:bg-slate-800/90 px-3.5 py-3 text-xs font-semibold text-slate-700 hover:bg-white hover:border-indigo-300 dark:border-slate-700 dark:text-slate-200 dark:hover:border-indigo-500 hover:shadow-md hover:shadow-indigo-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer backdrop-blur-xs"
-            >
-              <LinkIcon className="h-3.5 w-3.5 text-indigo-500" />
-              <span>URL</span>
-            </button>
-          </div>
-
-          {/* Supported formats & limits */}
-          <div className="mt-8 flex flex-col items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
-            <span className="font-semibold tracking-wide uppercase text-[11px] text-slate-500 dark:text-slate-400">
-              {t.hero.supportedBanner}
-            </span>
-            <span className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-              {t.uploader.maxLimitNotice}
-            </span>
-          </div>
-        </div>
+      {/* WORKFLOW STEP INDICATOR */}
+      <div className="flex items-center justify-center gap-2 sm:gap-4 text-xs font-semibold text-slate-400 dark:text-slate-500 py-1">
+        <span className={currentStep >= 1 ? 'text-slate-900 dark:text-white font-bold' : ''}>
+          01. Upload
+        </span>
+        <span className="text-slate-300 dark:text-slate-700">→</span>
+        <span className={currentStep >= 2 ? 'text-slate-900 dark:text-white font-bold' : ''}>
+          02. Configure
+        </span>
+        <span className="text-slate-300 dark:text-slate-700">→</span>
+        <span className={currentStep >= 3 ? 'text-slate-900 dark:text-white font-bold' : ''}>
+          03. Convert
+        </span>
+        <span className="text-slate-300 dark:text-slate-700">→</span>
+        <span className={currentStep >= 4 ? 'text-slate-900 dark:text-white font-bold' : ''}>
+          04. Download
+        </span>
       </div>
 
-      {/* QUEUE & FILE CARDS SECTION */}
-      {items.length > 0 && (
-        <div className="mt-8 space-y-4">
-          {/* Top batch control bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-slate-800 dark:text-white">
-                {items.length} {items.length === 1 ? 'file' : 'files'} in queue
-              </span>
-
-              {/* Batch target format */}
-              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                <span className="font-medium">Convert all to:</span>
-                <select
-                  id="batch-target-format-select"
-                  value={batchTarget}
-                  onChange={(e) => handleBatchFormatChange(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-slate-50/90 px-2.5 py-1 text-xs font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800/90 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">Select target</option>
-                  <option value="webp">WEBP (Image)</option>
-                  <option value="jpg">JPG (Image)</option>
-                  <option value="png">PNG (Image)</option>
-                  <option value="pdf">PDF (Document)</option>
-                  <option value="mp3">MP3 (Audio)</option>
-                  <option value="wav">WAV (Audio)</option>
-                  <option value="gif">GIF (Animation)</option>
-                </select>
-              </div>
-
-              {/* Engine mode switcher */}
-              <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50/90 px-2.5 py-1 dark:border-slate-700 dark:bg-slate-800/90">
-                <Cpu className="h-3.5 w-3.5 text-indigo-500" />
-                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Engine:</span>
-                <select
-                  value={engineMode}
-                  onChange={(e) => setEngineMode(e.target.value as any)}
-                  className="bg-transparent text-[11px] font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer"
-                >
-                  <option value="auto">⚡ Auto (WASM First)</option>
-                  <option value="wasm">⚡ WASM In-Browser Only</option>
-                  <option value="server">🖥️ Cloud Server (Fallback)</option>
-                </select>
-              </div>
+      {/* MAIN UPLOAD / FILE PROCESSING CONTAINER */}
+      <div className="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-10 shadow-sm dark:border-slate-800 dark:bg-slate-900/90 transition-all">
+        {items.length === 0 ? (
+          /* EMPTY STATE / HERO DROPZONE */
+          <div
+            id="main-dropzone"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`group relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-10 sm:p-14 text-center transition-all cursor-pointer ${
+              isDragging
+                ? 'border-slate-900 bg-slate-50 dark:border-white dark:bg-slate-800/80 scale-[1.01]'
+                : 'border-slate-200/90 hover:border-slate-400 hover:bg-slate-50/50 dark:border-slate-700/80 dark:hover:border-slate-600 dark:hover:bg-slate-800/30'
+            }`}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {/* Upload Icon */}
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 mb-4 transition-transform group-hover:scale-105">
+              <UploadCloud className="h-7 w-7" />
             </div>
 
-            <div className="flex items-center gap-2">
+            <h3 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              {isDragging ? 'Drop to upload' : 'Drop your files here'}
+            </h3>
+            <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              or choose files from your device
+            </p>
+
+            {/* Primary Action Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
+              className="mt-6 rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              Choose Files
+            </button>
+
+            {/* Secondary Options */}
+            <div
+              className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
-                id="add-more-files-btn"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:scale-[1.02] active:scale-[0.98] dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-200 transition-all cursor-pointer"
+                type="button"
+                onClick={handlePaste}
+                className="inline-flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
               >
-                <Plus className="h-3.5 w-3.5 text-indigo-500" />
-                <span>{t.actions.addMore}</span>
+                <Clipboard className="h-3.5 w-3.5" />
+                <span>Paste</span>
               </button>
-
-              {hasCompletedItems && (
-                <button
-                  id="download-zip-btn"
-                  onClick={handleDownloadAllZip}
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-3.5 py-1.5 text-xs font-bold text-white hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-emerald-600/25 transition-all cursor-pointer"
-                >
-                  <FolderArchive className="h-3.5 w-3.5" />
-                  <span>{t.actions.downloadZip}</span>
-                </button>
-              )}
-
-              {hasReadyItems && (
-                <button
-                  id="convert-all-btn"
-                  onClick={handleConvertAll}
-                  disabled={isConvertingAll}
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-4 py-1.5 text-xs font-bold text-white hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-indigo-500/25 transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  {isConvertingAll ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  )}
-                  <span>{t.actions.convertAll}</span>
-                </button>
-              )}
-
+              <span className="text-slate-300 dark:text-slate-700">·</span>
               <button
-                id="clear-all-queue-btn"
-                onClick={() => setItems([])}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-rose-600 hover:scale-105 active:scale-95 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                title="Clear all"
+                type="button"
+                onClick={() => setIsUrlModalOpen(true)}
+                className="inline-flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
               >
-                <Trash2 className="h-4 w-4" />
+                <LinkIcon className="h-3.5 w-3.5" />
+                <span>Add from URL</span>
               </button>
+              <span className="text-slate-300 dark:text-slate-700">·</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setCloudSource('gdrive');
+                  setIsCloudModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>Cloud Drive</span>
+              </button>
+            </div>
+
+            {/* Subtly Supported Formats */}
+            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800/80 text-[11px] text-slate-400">
+              Images • PDF • Video • Audio • Documents
             </div>
           </div>
+        ) : (
+          /* FILE PROCESSING INTERFACE */
+          <div className="space-y-6">
+            {/* Top Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">
+                  {items.length} {items.length === 1 ? 'file ready' : 'files ready'}
+                </span>
+                <p className="text-xs text-slate-400">Configure target format below and convert.</p>
+              </div>
 
-          {/* LIST OF FILE CARDS */}
-          <div className="space-y-3">
-            {items.map((item) => {
-              const isCompleted = item.status === 'completed';
-              const isFailed = item.status === 'failed';
-              const isBusy = item.status === 'uploading' || item.status === 'queued' || item.status === 'processing';
-
-              return (
-                <div
-                  key={item.id}
-                  id={`file-card-${item.id}`}
-                  className="group rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-xs dark:border-slate-800/80 dark:bg-slate-900/80 backdrop-blur-sm transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-lg hover:shadow-indigo-500/5 hover:-translate-y-0.5"
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    {/* Left: Thumbnail & Name & Sizes */}
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      {/* Thumbnail or Category Icon */}
-                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
-                        {item.previewUrl ? (
-                          <img
-                            src={item.previewUrl}
-                            alt="preview"
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <FileIcon className="h-6 w-6 text-slate-400 dark:text-slate-500" />
-                        )}
-                        <span className="absolute bottom-0 inset-x-0 bg-slate-950/80 text-[9px] font-bold text-white text-center uppercase tracking-wider py-0.5 backdrop-blur-xs">
-                          {item.extension}
-                        </span>
-                      </div>
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add more files</span>
+                </button>
 
+                <button
+                  onClick={() => setItems([])}
+                  className="rounded-xl border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50 hover:text-rose-600 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Clear all"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* File List Cards */}
+            <div className="space-y-3">
+              {items.map((item) => {
+                const isSelectorOpen = openSelectorId === item.id;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="relative rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 dark:border-slate-800 dark:bg-slate-950/70 transition-all hover:border-slate-300 dark:hover:border-slate-700 shadow-xs"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       {/* File Details */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate max-w-[280px] sm:max-w-md group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                            {item.originalName}
-                          </p>
-                          {isCompleted && (
-                            <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 px-2 py-0.5 text-[11px] font-bold flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3" /> Ready
-                            </span>
-                          )}
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          <FileIcon className="h-5 w-5" />
                         </div>
-
-                        {/* Size & Savings */}
-                        <div className="mt-0.5 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                          <span>{formatBytes(item.size)}</span>
-
-                          {isCompleted && item.outputSize && (
-                            <>
-                              <span>→</span>
-                              <span className="font-semibold text-slate-700 dark:text-slate-200">
-                                {formatBytes(item.outputSize)}
-                              </span>
-                              {item.savedPercent !== undefined && item.savedPercent > 0 && (
-                                <span className="rounded bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold px-1.5 py-0.2 text-[10px]">
-                                  {item.savedPercent}% saved
-                                </span>
-                              )}
-                            </>
-                          )}
-
-                          {/* WASM vs Server Badge */}
-                          {item.engineMode === 'wasm' || (!item.engineMode && canConvertClientSide(item.extension, item.targetFormat)) ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-900/50">
-                              <Cpu className="h-2.5 w-2.5" />
-                              {isCompleted ? 'WASM Local' : 'WASM In-Browser'}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 text-[10px] font-medium text-slate-500">
-                              <Server className="h-2.5 w-2.5" />
-                              Server Mode
-                            </span>
-                          )}
+                        <div className="min-w-0">
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                            {item.originalName}
+                          </h4>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                            <span>{formatBytes(item.size)}</span>
+                            <span>·</span>
+                            <span className="uppercase font-mono font-medium">{item.extension}</span>
+                            {item.engineMode === 'wasm' && (
+                              <>
+                                <span>·</span>
+                                <span className="text-emerald-600 dark:text-emerald-400">Client WASM</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Right: Target Selector, Settings, Action Button */}
-                    <div className="flex items-center justify-between sm:justify-end gap-2.5">
-                      {!isCompleted ? (
-                        <>
-                          {/* Target format select */}
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-slate-400 hidden sm:inline">to:</span>
-                            <select
-                              value={item.targetFormat}
-                              disabled={isBusy}
-                              onChange={(e) => {
-                                const newTarget = e.target.value;
-                                setItems((prev) =>
-                                  prev.map((i) =>
-                                    i.id === item.id ? { ...i, targetFormat: newTarget } : i
-                                  )
-                                );
-                              }}
-                              className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-900 uppercase dark:border-slate-700 dark:bg-slate-800 dark:text-white cursor-pointer focus:ring-2 focus:ring-indigo-500"
-                            >
-                              {item.supportedTargets.map((target) => (
-                                <option key={target} value={target}>
-                                  {target.toUpperCase()}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          {/* Gear / Options modal */}
-                          <button
-                            onClick={() => setActiveSettingsItem(item)}
-                            disabled={isBusy}
-                            className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 hover:scale-105 active:scale-95 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                            title="Advanced Settings"
-                          >
-                            <Settings className="h-4 w-4" />
-                          </button>
-
-                          {/* Convert Single Button */}
-                          <button
-                            onClick={() => convertItem(item.id)}
-                            disabled={isBusy}
-                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 px-4 py-2 text-xs font-bold text-white hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-indigo-500/20 disabled:opacity-50 transition-all cursor-pointer"
-                          >
-                            {isBusy ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <RefreshCw className="h-3.5 w-3.5" />
-                            )}
-                            <span>{isBusy ? t.actions.processing : t.nav.convert}</span>
-                          </button>
-                        </>
-                      ) : (
-                        /* Completed State Action Buttons */
+                      {/* SMART CONVERSION SELECTOR (JPG -> PNG) */}
+                      <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-2">
+                          <span className="text-xs uppercase font-mono font-bold text-slate-500">
+                            {item.extension}
+                          </span>
+                          <span className="text-slate-300 dark:text-slate-700 text-sm">→</span>
+
+                          {/* Output Format Selector Pill */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenSelectorId(isSelectorOpen ? null : item.id)
+                              }
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-slate-900 hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                            >
+                              <span>{item.targetFormat}</span>
+                              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {isSelectorOpen && (
+                              <div className="absolute right-0 top-full mt-1.5 z-30 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-800 dark:bg-slate-900 animate-in fade-in">
+                                {item.supportedTargets.map((target) => (
+                                  <button
+                                    key={target}
+                                    type="button"
+                                    onClick={() => {
+                                      setItems((prev) =>
+                                        prev.map((i) =>
+                                          i.id === item.id ? { ...i, targetFormat: target } : i
+                                        )
+                                      );
+                                      setOpenSelectorId(null);
+                                    }}
+                                    className={`w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold uppercase transition-colors ${
+                                      item.targetFormat === target
+                                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                                    }`}
+                                  >
+                                    {target}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Settings Button */}
+                        <button
+                          type="button"
+                          onClick={() => setActiveSettingsItem(item)}
+                          className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Conversion settings"
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                        </button>
+
+                        {/* Individual Convert / Download Button */}
+                        {item.status === 'completed' ? (
                           <a
-                            href={item.downloadUrl || '#'}
-                            download={item.outputFilename}
-                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-4 py-2 text-xs font-bold text-white hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-emerald-600/25 transition-all cursor-pointer"
+                            href={item.downloadUrl}
+                            download={item.outputFilename || `converted.${item.targetFormat}`}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-xs transition-all cursor-pointer"
                           >
                             <Download className="h-3.5 w-3.5" />
-                            <span>{t.actions.download}</span>
+                            <span>Download</span>
                           </a>
-
+                        ) : item.status === 'processing' || item.status === 'uploading' ? (
+                          <div className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300">
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            <span>{item.progress}%</span>
+                          </div>
+                        ) : (
                           <button
-                            onClick={() => handleRemoveItem(item.id)}
-                            className="rounded-xl border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-rose-600 hover:scale-105 active:scale-95 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                            title="Delete and remove"
+                            type="button"
+                            onClick={() => convertItem(item.id)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Convert</span>
+                            <ArrowRight className="h-3.5 w-3.5" />
                           </button>
-                        </div>
-                      )}
+                        )}
 
-                      {!isCompleted && !isBusy && (
+                        {/* Remove item button */}
                         <button
-                          onClick={() => handleRemoveItem(item.id)}
-                          className="rounded-xl p-2 text-slate-400 hover:text-rose-500 hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                          title="Remove from queue"
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                          title="Remove file"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <X className="h-4 w-4" />
                         </button>
-                      )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Progress Bar (while active) */}
-                  {isBusy && (
-                    <div className="mt-3">
-                      <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                        <span className="font-medium">
-                          {item.status === 'uploading'
-                            ? t.actions.uploading
-                            : item.status === 'queued'
-                            ? 'In queue...'
-                            : t.actions.processing}
+                    {/* Progress Bar during conversion */}
+                    {(item.status === 'processing' || item.status === 'uploading') && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                        <div className="flex justify-between text-[11px] text-slate-500 font-medium">
+                          <span>Processing your file...</span>
+                          <span>{item.progress}%</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                          <div
+                            className="h-full bg-slate-900 dark:bg-white transition-all duration-300"
+                            style={{ width: `${item.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Completion Message */}
+                    {item.status === 'completed' && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400">
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span className="font-semibold">Your file is ready.</span>
+                          {item.savedPercent && item.savedPercent > 0 ? (
+                            <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold dark:bg-emerald-950/60">
+                              -{item.savedPercent}% saved
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          {formatBytes(item.outputSize || item.size)}
                         </span>
-                        <span className="font-bold text-indigo-600 dark:text-indigo-400">{item.progress}%</span>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div
-                          className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-all duration-300 rounded-full animate-shimmer"
-                          style={{ width: `${item.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Error display */}
-                  {isFailed && (
-                    <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-rose-50 p-2 text-xs text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      <span>{item.errorMessage || 'Conversion failed. Please try again with different settings.'}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    {/* Error State */}
+                    {item.status === 'failed' && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-rose-600 dark:text-rose-400">
+                        <div className="flex items-center gap-1.5">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{item.errorMessage || "We couldn't process this file."}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => convertItem(item.id)}
+                          className="font-semibold underline hover:no-underline cursor-pointer"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom Batch Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="text-xs text-slate-400">
+                100% private • Files automatically purged after 1 hour
+              </div>
+
+              <div className="flex items-center gap-3">
+                {hasCompletedItems && (
+                  <button
+                    onClick={handleDownloadAllZip}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>Download All as ZIP</span>
+                  </button>
+                )}
+
+                {hasReadyItems && (
+                  <button
+                    onClick={handleConvertAll}
+                    disabled={isConvertingAll}
+                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2 text-xs font-semibold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  >
+                    {isConvertingAll ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        <span>Converting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Convert All Files</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* URL Import Modal */}
+      {isUrlModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs" onClick={() => setIsUrlModalOpen(false)} />
+          <div className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900 z-10">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">Import from URL</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+              Enter a direct public link to any image, audio, video, or document.
+            </p>
+            <input
+              type="url"
+              placeholder="https://example.com/file.mp4"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white mb-4 focus:outline-none focus:ring-1 focus:ring-slate-900"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsUrlModalOpen(false)}
+                className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={urlLoading || !urlInput.trim()}
+                onClick={handleUrlImport}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900"
+              >
+                {urlLoading ? 'Downloading...' : 'Import File'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* CLOUD & URL IMPORT MODAL */}
-      <CloudImportModal
-        isOpen={isCloudModalOpen}
-        initialSource={cloudSource}
-        onClose={() => setIsCloudModalOpen(false)}
-        onFileImported={(importedFile) => {
-          handleAddFiles([importedFile]);
-        }}
-      />
-
-      {/* Advanced Settings Modal */}
+      {/* Settings Modal */}
       {activeSettingsItem && (
         <ConversionSettingsModal
           item={activeSettingsItem}
+          isOpen={true}
           onClose={() => setActiveSettingsItem(null)}
-          onSave={(itemId, newOpts) => {
+          onSave={(options) => {
             setItems((prev) =>
-              prev.map((i) => (i.id === itemId ? { ...i, options: newOpts } : i))
+              prev.map((i) => (i.id === activeSettingsItem.id ? { ...i, options } : i))
             );
+            setActiveSettingsItem(null);
           }}
         />
       )}
+
+      {/* Cloud Import Modal */}
+      <CloudImportModal
+        isOpen={isCloudModalOpen}
+        onClose={() => setIsCloudModalOpen(false)}
+        source={cloudSource}
+        onFileSelected={(file) => {
+          handleAddFiles([file]);
+          setIsCloudModalOpen(false);
+        }}
+      />
     </div>
   );
 };
