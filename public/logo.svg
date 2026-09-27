@@ -1,6 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
-  <rect width="48" height="48" rx="12" fill="#2563eb" />
-  <path d="M14 17h14a5 5 0 0 1 5 5v1m-4-3 4-3 4 3" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-  <path d="M34 31H20a5 5 0 0 1-5-5v-1m4 3-4 3-4-3" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-  <circle cx="24" cy="24" r="2.5" fill="#ffffff" />
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#9333ea" />
+    </linearGradient>
+    <linearGradient id="glassHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <!-- Rounded squircle base with shadow -->
+  <rect width="48" height="48" rx="14" fill="url(#bgGrad)" />
+  <rect width="48" height="48" rx="14" fill="url(#glassHighlight)" />
+  <rect x="0.5" y="0.5" width="47" height="47" rx="13.5" stroke="#ffffff" stroke-opacity="0.25" fill="none" />
+  
+  <!-- Intertwined 'C' Loop & 'X' Interchange Mark -->
+  <g stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Top-left C curve -->
+    <path d="M12 28V18a6 6 0 0 1 6-6h4" />
+    <path d="M16 23.5L21.5 28L16 32.5" />
+    <!-- Bottom-right loop -->
+    <path d="M36 20v10a6 6 0 0 1-6 6h-4" />
+    <path d="M32 24.5L26.5 20L32 15.5" />
+    <!-- Interchange dynamic cross 'X' center -->
+    <path d="M20 20L28 28" />
+    <path d="M28 20L20 28" />
+  </g>
 </svg>

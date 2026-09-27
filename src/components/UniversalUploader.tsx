@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ChevronDown,
   Cloud,
+  X,
 } from 'lucide-react';
 import { UploadedFileItem, Language } from '../types';
 import { en } from '../locales/en';
@@ -57,6 +58,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
   const [batchTarget, setBatchTarget] = useState<string>('');
   const [registry, setRegistry] = useState<Record<string, any>>({});
   const [engineMode, setEngineMode] = useState<'auto' | 'wasm' | 'server'>('auto');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Fetch registry formats on mount
   useEffect(() => {
@@ -136,11 +138,11 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
 
     for (const file of filesArray) {
       if (items.length + newItems.length >= 10) {
-        alert('Maximum 10 files can be converted simultaneously.');
+        setToastMessage('Maximum 10 files can be converted simultaneously.');
         break;
       }
       if (file.size > 500 * 1024 * 1024) {
-        alert(`File ${file.name} exceeds the 500 MB limit.`);
+        setToastMessage(`File "${file.name}" exceeds the 500 MB limit.`);
         continue;
       }
 
@@ -585,7 +587,7 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
       a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(err.message || 'Failed to download ZIP.');
+      setToastMessage(err.message || 'Failed to download ZIP.');
     }
   };
 
@@ -602,6 +604,23 @@ export const UniversalUploader: React.FC<UniversalUploaderProps> = ({
 
   return (
     <div className="w-full">
+      {/* Non-intrusive warning/notice toast */}
+      {toastMessage && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-xs font-semibold text-amber-900 shadow-sm backdrop-blur-md dark:border-amber-800/60 dark:bg-amber-950/70 dark:text-amber-200 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>{toastMessage}</span>
+          </div>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="rounded-lg p-1 text-amber-700 hover:bg-amber-200/50 dark:text-amber-300 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+            aria-label="Dismiss notification"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Hidden file input */}
       <input
         ref={fileInputRef}

@@ -77,7 +77,7 @@ export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = '
 
   const handleMergeSubmit = async () => {
     if (mergeFiles.length < 2) {
-      alert('Please upload at least 2 PDF files to merge.');
+      setMergeError('Please upload at least 2 PDF files to merge.');
       return;
     }
     setIsMerging(true);
