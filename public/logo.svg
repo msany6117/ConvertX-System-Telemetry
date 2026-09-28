@@ -1,42 +1,13 @@
 <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="cxGradTL_BR" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="cxTextGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#00C0FA" />
-      <stop offset="45%" stop-color="#2563EB" />
+      <stop offset="50%" stop-color="#2563EB" />
       <stop offset="100%" stop-color="#8B5CF6" />
     </linearGradient>
-
-    <linearGradient id="cxGradBL_TR" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00B4D8" />
-      <stop offset="35%" stop-color="#3B82F6" />
-      <stop offset="75%" stop-color="#6366F1" />
-      <stop offset="100%" stop-color="#9333EA" />
-    </linearGradient>
-
-    <filter id="cxCrossoverShadow" x="-15%" y="-15%" width="130%" height="130%">
-      <feDropShadow dx="-2" dy="2" stdDeviation="3.5" flood-color="#0f172a" flood-opacity="0.45" />
-    </filter>
   </defs>
-
-  <!-- Ribbon 1: Top-Left to Bottom-Right stroke -->
-  <path
-    d="M20 15 C13 15 10 22 15 28 L72 85 C77 90 84 90 88 85 C92 81 91 74 86 69 L28 17 C25 15 22 15 20 15 Z"
-    fill="url(#cxGradTL_BR)"
-  />
-
-  <!-- Ribbon 2 with Arrow: Bottom-Left to Top-Right ascending crossover -->
-  <g filter="url(#cxCrossoverShadow)">
-    <path
-      d="M17 76 C12 81 13 88 18 92 C23 96 30 95 35 90 L63 56 L61 46 L51 44 L25 70 C20 73 18 75 17 76 Z"
-      fill="url(#cxGradBL_TR)"
-    />
-    <path
-      d="M32 63 L65 30 L63 21 L85 14 L80 37 L72 35 L50 57 Z"
-      fill="url(#cxGradBL_TR)"
-    />
-    <path
-      d="M62 20 L87 14 C90 13 92 15 91 18 L84 43 L73 39 L79 26 L66 32 Z"
-      fill="url(#cxGradBL_TR)"
-    />
-  </g>
+  <rect width="100" height="100" rx="24" fill="#0f172a" />
+  <text x="50" y="66" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="46" font-weight="900" text-anchor="middle" fill="#ffffff" letter-spacing="-1">
+    C<tspan fill="url(#cxTextGrad)">X</tspan>
+  </text>
 </svg>
