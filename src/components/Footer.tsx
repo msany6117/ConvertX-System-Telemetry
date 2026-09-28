@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShieldCheck, Github, Twitter } from 'lucide-react';
 import { Language } from '../types';
+import { BrandLogo } from './BrandLogo';
 
 interface FooterProps {
   language: Language;
@@ -15,30 +16,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Column 1: Brand & Identity */}
           <div className="col-span-2 space-y-3">
             <div
-              className="flex items-center gap-2.5 cursor-pointer"
+              className="cursor-pointer"
               onClick={() => onNavigate('/')}
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs dark:bg-white dark:text-slate-900">
-                <svg
-                  className="h-3.5 w-3.5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M4 16V8a3.5 3.5 0 0 1 3.5-3.5h3" />
-                  <path d="M7 13.5L10 16.5L7 19.5" />
-                  <path d="M20 8v8a3.5 3.5 0 0 1-3.5 3.5h-3" />
-                  <path d="M17 10.5L14 7.5L17 4.5" />
-                  <path d="M9.5 9.5L14.5 14.5" />
-                  <path d="M14.5 9.5L9.5 14.5" />
-                </svg>
-              </div>
-              <span className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
-                Convert<span className="text-indigo-600 dark:text-indigo-400">X</span>
-              </span>
+              <BrandLogo variant="mark-with-text" size="md" showSubtitle={true} />
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">

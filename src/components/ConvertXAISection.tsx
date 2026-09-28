@@ -48,15 +48,20 @@ export const ConvertXAISection: React.FC<ConvertXAISectionProps> = ({
         desc = 'Convert PDF document directly to editable Microsoft Word format.';
         explanation = 'ConvertX AI selected the PDF to Word converter engine with layout preservation.';
       } else if (query.includes('compress') && (query.includes('image') || query.includes('jpg') || query.includes('png') || query.includes('mb'))) {
-        matchedRoute = '/image/image-compressor';
+        matchedRoute = '/image-compressor';
         matchedName = 'Image Compressor';
         desc = 'Shrink JPG, PNG, and WebP file sizes below 1 MB without visual blur.';
         explanation = 'ConvertX AI selected high-efficiency WebP/MozJPEG compression presets.';
       } else if (query.includes('video') && (query.includes('small') || query.includes('compress') || query.includes('shrink'))) {
-        matchedRoute = '/video/video-compressor';
+        matchedRoute = '/video-compressor';
         matchedName = 'Video Compressor';
         desc = 'Compress MP4, WebM, and MOV videos with H.264 CRF tuning.';
-        explanation = 'ConvertX AI loaded client-side FFmpeg WebAssembly video rate controller.';
+        explanation = 'ConvertX AI loaded optimized FFmpeg video rate controller.';
+      } else if (query.includes('svg') || query.includes('vector')) {
+        matchedRoute = query.includes('svg to') ? '/svg-to-image' : '/image-to-svg';
+        matchedName = query.includes('svg to') ? 'SVG to Image' : 'Image to SVG';
+        desc = 'High-resolution scalable vector conversion with custom DPI and color layers.';
+        explanation = 'ConvertX AI selected the vector conversion engine.';
       } else if (query.includes('combine') || query.includes('merge') || (query.includes('images') && query.includes('pdf'))) {
         matchedRoute = '/tools/merge-pdf';
         matchedName = 'PDF & Image Binder';

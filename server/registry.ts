@@ -27,7 +27,7 @@ export const CONVERSION_REGISTRY: Record<string, FormatInfo> = {
     category: 'image',
     mime: 'image/jpeg',
     label: 'JPEG Image',
-    targetFormats: ['png', 'webp', 'avif', 'gif', 'bmp', 'tiff', 'ico', 'pdf'],
+    targetFormats: ['png', 'webp', 'avif', 'svg', 'gif', 'bmp', 'tiff', 'ico', 'pdf'],
     options: { canQuality: true, canResize: true, canRotate: true }
   },
   jpeg: {
@@ -35,7 +35,7 @@ export const CONVERSION_REGISTRY: Record<string, FormatInfo> = {
     category: 'image',
     mime: 'image/jpeg',
     label: 'JPEG Image',
-    targetFormats: ['png', 'webp', 'avif', 'gif', 'bmp', 'tiff', 'ico', 'pdf'],
+    targetFormats: ['png', 'webp', 'avif', 'svg', 'gif', 'bmp', 'tiff', 'ico', 'pdf'],
     options: { canQuality: true, canResize: true, canRotate: true }
   },
   png: {
@@ -43,7 +43,7 @@ export const CONVERSION_REGISTRY: Record<string, FormatInfo> = {
     category: 'image',
     mime: 'image/png',
     label: 'PNG Image',
-    targetFormats: ['jpg', 'webp', 'avif', 'gif', 'bmp', 'tiff', 'ico', 'pdf'],
+    targetFormats: ['jpg', 'webp', 'avif', 'svg', 'gif', 'bmp', 'tiff', 'ico', 'pdf'],
     options: { canQuality: true, canResize: true, canRotate: true }
   },
   webp: {
@@ -51,7 +51,7 @@ export const CONVERSION_REGISTRY: Record<string, FormatInfo> = {
     category: 'image',
     mime: 'image/webp',
     label: 'WebP Image',
-    targetFormats: ['jpg', 'png', 'avif', 'gif', 'bmp', 'tiff', 'pdf'],
+    targetFormats: ['jpg', 'png', 'avif', 'svg', 'gif', 'bmp', 'tiff', 'pdf'],
     options: { canQuality: true, canResize: true, canRotate: true }
   },
   avif: {

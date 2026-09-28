@@ -25,9 +25,9 @@ export const ToolCategoriesSection: React.FC<ToolCategoriesSectionProps> = ({ on
       route: '/image',
       tools: [
         { label: 'JPG to PNG', route: '/tools/jpg-to-png' },
-        { label: 'PNG to JPG', route: '/tools/png-to-jpg' },
-        { label: 'WEBP Converter', route: '/tools/jpg-to-webp' },
-        { label: 'Image Compressor', route: '/image/image-compressor' },
+        { label: 'Image Compressor', route: '/image-compressor' },
+        { label: 'Image to SVG', route: '/image-to-svg' },
+        { label: 'SVG to Image', route: '/svg-to-image' },
         { label: 'Image Resizer', route: '/tools/image-resizer' },
       ],
     },
@@ -52,11 +52,11 @@ export const ToolCategoriesSection: React.FC<ToolCategoriesSectionProps> = ({ on
       icon: Video,
       route: '/video',
       tools: [
+        { label: 'Video Compressor', route: '/video-compressor' },
+        { label: 'Video Converter', route: '/video-converter' },
         { label: 'MP4 to MP3', route: '/tools/mp4-to-mp3' },
-        { label: 'Video Compressor', route: '/video/video-compressor' },
         { label: 'Video to GIF', route: '/video/mp4-to-gif' },
         { label: 'MP4 to WebM', route: '/video/mp4-to-webm' },
-        { label: 'MOV to MP4', route: '/video/mov-to-mp4' },
       ],
     },
     {
@@ -94,11 +94,11 @@ export const ToolCategoriesSection: React.FC<ToolCategoriesSectionProps> = ({ on
       icon: FolderArchive,
       route: '/compress',
       tools: [
+        { label: 'Image Compressor', route: '/image-compressor' },
+        { label: 'Video Compressor', route: '/video-compressor' },
+        { label: 'Compress PDF', route: '/tools/compress-pdf' },
         { label: 'Create ZIP Package', route: '/compress' },
         { label: 'Extract RAR / 7Z', route: '/tools' },
-        { label: 'Compress Video', route: '/video/video-compressor' },
-        { label: 'Compress PDF', route: '/pdf/compress' },
-        { label: 'Compress Image', route: '/image/image-compressor' },
       ],
     },
     {

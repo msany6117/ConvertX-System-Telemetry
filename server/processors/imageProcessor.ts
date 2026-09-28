@@ -125,11 +125,28 @@ export async function processImage(
       case 'gif':
         pipeline = pipeline.gif();
         break;
-      case 'tiff':
-        pipeline = pipeline.tiff({ quality: q });
+      case 'svg':
+        // Generate valid SVG wrapping or vectorization
+        const meta = await pipeline.metadata();
+        const base64Data = (await pipeline.png().toBuffer()).toString('base64');
+        const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${meta.width || 800} ${meta.height || 600}" width="${meta.width || 800}" height="${meta.height || 600}">
+  <image href="data:image/png;base64,${base64Data}" width="${meta.width || 800}" height="${meta.height || 600}" preserveAspectRatio="xMidYMid meet" />
+</svg>`;
+        await fs.promises.writeFile(outputPath, svgContent, 'utf-8');
+        return;
+      case 'compress':
+        // Determine best compressed format based on input
+        const inExt = path.extname(inputPath).toLowerCase();
+        if (inExt === '.png') {
+          pipeline = pipeline.png({ compressionLevel: 9, palette: true, quality: Math.min(q, 80) });
+        } else if (inExt === '.webp') {
+          pipeline = pipeline.webp({ quality: Math.min(q, 75), effort: 6 });
+        } else {
+          pipeline = pipeline.jpeg({ quality: Math.min(q, 75), mozjpeg: true });
+        }
         break;
       default:
-        // Try fallback to ImageMagick if Sharp doesn't support format directly (like ICO, BMP)
+        // Try fallback to ImageMagick if Sharp doesn't support format directly (like ICO, BMP, EPS)
         return await convertViaImageMagick(inputPath, outputPath, normTarget, options);
     }
 

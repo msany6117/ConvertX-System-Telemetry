@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Search, Moon, Sun, Menu, X, ArrowRight, Sparkles, Layers, Globe } from 'lucide-react';
 import { Language, Theme } from '../types';
 import { AuthModal } from './AuthModal';
-import { ConvertXLogo } from './ConvertXLogo';
+import { BrandLogo } from './BrandLogo';
 
 interface NavbarProps {
   currentRoute?: string;
@@ -76,9 +76,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center gap-6">
             <button
               onClick={() => handleNav('/')}
-              className="group flex items-center text-left focus:outline-none rounded-lg p-0.5 cursor-pointer"
+              className="flex items-center text-left focus:outline-none rounded-lg p-0.5 cursor-pointer"
             >
-              <ConvertXLogo size={32} />
+              <BrandLogo variant="mark-with-text" size="md" />
             </button>
 
             {/* Center Navigation (Desktop) */}

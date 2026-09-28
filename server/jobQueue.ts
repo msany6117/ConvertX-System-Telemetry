@@ -153,8 +153,14 @@ class JobQueue {
 
     // Generate output filename & path
     const parsed = path.parse(job.originalFilename);
-    const outExt = job.targetFormat === 'split' ? 'zip' : job.targetFormat;
-    const outputFilename = `${parsed.name}_converted.${outExt}`;
+    const inExt = parsed.ext.toLowerCase().replace('.', '');
+    let outExt = job.targetFormat === 'split' ? 'zip' : job.targetFormat;
+    let suffix = 'converted';
+    if (job.targetFormat === 'compress') {
+      suffix = 'compressed';
+      outExt = inExt || (job.fileCategory === 'video' ? 'mp4' : 'jpg');
+    }
+    const outputFilename = `${parsed.name}_${suffix}.${outExt}`;
     const outputPath = path.join(CONFIG.DIR_OUTPUT, `${job.id}_${outputFilename}`);
     job.outputFilename = outputFilename;
     job.outputPath = outputPath;

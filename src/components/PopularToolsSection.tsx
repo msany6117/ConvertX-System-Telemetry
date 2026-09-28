@@ -50,11 +50,27 @@ export const PopularToolsSection: React.FC<PopularToolsSectionProps> = ({ onSele
     },
     {
       id: 'compress-image',
-      name: 'Compress Image',
+      name: 'Image Compressor',
       description: 'Optimize JPG, PNG, and WebP images by up to 80% with visual fidelity.',
       icon: Minimize2,
-      route: '/image/image-compressor',
-      badge: 'Optimization',
+      route: '/image-compressor',
+      badge: 'Compressor',
+    },
+    {
+      id: 'video-compressor',
+      name: 'Video Compressor',
+      description: 'Reduce MP4, MOV, and WebM video megabytes while preserving 1080p quality.',
+      icon: Video,
+      route: '/video-compressor',
+      badge: 'Compressor',
+    },
+    {
+      id: 'image-to-svg',
+      name: 'Image to SVG',
+      description: 'Convert raster photos and logos into scalable infinite-resolution SVG vectors.',
+      icon: ImageIcon,
+      route: '/image-to-svg',
+      badge: 'Vector',
     },
     {
       id: 'mp4-to-mp3',
@@ -63,22 +79,6 @@ export const PopularToolsSection: React.FC<PopularToolsSectionProps> = ({ onSele
       icon: Music,
       route: '/tools/mp4-to-mp3',
       badge: 'Audio',
-    },
-    {
-      id: 'video-compressor',
-      name: 'Video Compressor',
-      description: 'Reduce MP4, MOV, and WebM video megabytes while preserving 1080p quality.',
-      icon: Video,
-      route: '/video/video-compressor',
-      badge: 'Video',
-    },
-    {
-      id: 'image-resizer',
-      name: 'Image Resizer',
-      description: 'Resize dimensions with locked aspect ratios and social media presets.',
-      icon: Maximize2,
-      route: '/tools/image-resizer',
-      badge: 'Utility',
     },
   ];
 

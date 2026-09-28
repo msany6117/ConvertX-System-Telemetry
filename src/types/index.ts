@@ -1,4 +1,4 @@
-export type FileCategory = 'image' | 'video' | 'audio' | 'pdf' | 'document' | 'archive' | 'other';
+export type FileCategory = 'image' | 'video' | 'audio' | 'pdf' | 'document' | 'archive' | 'compression' | 'utility' | 'other';
 
 export type JobStatus = 'uploading' | 'ready' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
 

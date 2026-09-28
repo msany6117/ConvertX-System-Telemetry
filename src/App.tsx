@@ -23,6 +23,12 @@ import { AdminView } from './components/AdminView';
 import { SearchModal } from './components/SearchModal';
 import { AboutPage, PrivacyPage, TermsPage, FaqPage, ContactPage } from './components/StaticPages';
 import { DedicatedToolPage } from './components/DedicatedToolPage';
+import { ImageCompressorTool } from './components/ImageCompressorTool';
+import { VideoCompressorTool } from './components/VideoCompressorTool';
+import { ImageConverterTool } from './components/ImageConverterTool';
+import { VideoConverterTool } from './components/VideoConverterTool';
+import { ImageToSvgTool } from './components/ImageToSvgTool';
+import { SvgToImageTool } from './components/SvgToImageTool';
 import { TOOLS_LIST } from './data/tools';
 
 export default function App() {
@@ -240,6 +246,53 @@ export default function App() {
       );
     }
 
+    // DEDICATED COMPRESSOR & CONVERTER & SVG TOOLS
+    if (
+      currentRoute === '/image-compressor' ||
+      currentRoute === '/image/image-compressor' ||
+      currentRoute === '/tools/image-compressor'
+    ) {
+      return <ImageCompressorTool language={language} />;
+    }
+
+    if (
+      currentRoute === '/video-compressor' ||
+      currentRoute === '/video/video-compressor' ||
+      currentRoute === '/tools/video-compressor'
+    ) {
+      return <VideoCompressorTool />;
+    }
+
+    if (
+      currentRoute === '/image-converter' ||
+      currentRoute === '/image/image-converter' ||
+      currentRoute === '/tools/image-converter'
+    ) {
+      return <ImageConverterTool language={language} onNavigate={navigateTo} />;
+    }
+
+    if (
+      currentRoute === '/video-converter' ||
+      currentRoute === '/video/video-converter' ||
+      currentRoute === '/tools/video-converter'
+    ) {
+      return <VideoConverterTool language={language} onNavigate={navigateTo} />;
+    }
+
+    if (
+      currentRoute === '/image-to-svg' ||
+      currentRoute === '/tools/image-to-svg'
+    ) {
+      return <ImageToSvgTool />;
+    }
+
+    if (
+      currentRoute === '/svg-to-image' ||
+      currentRoute === '/tools/svg-to-image'
+    ) {
+      return <SvgToImageTool />;
+    }
+
     // SPECIALTY TOOLS
     if (
       currentRoute === '/image-resizer' ||
@@ -402,12 +455,13 @@ export default function App() {
               {/* Quick Format Shortcuts */}
               <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs">
                 {[
+                  { label: 'Image Compressor', route: '/image-compressor' },
+                  { label: 'Video Compressor', route: '/video-compressor' },
+                  { label: 'Image to SVG', route: '/image-to-svg' },
+                  { label: 'SVG to Image', route: '/svg-to-image' },
                   { label: 'PDF to Word', route: '/tools/pdf-to-docx' },
                   { label: 'JPG to PNG', route: '/tools/jpg-to-png' },
                   { label: 'MP4 to MP3', route: '/tools/mp4-to-mp3' },
-                  { label: 'Compress PDF', route: '/tools/compress-pdf' },
-                  { label: 'Image Resizer', route: '/tools/image-resizer' },
-                  { label: 'Unit Converter', route: '/tools/unit-converter' },
                 ].map((item) => (
                   <button
                     key={item.label}

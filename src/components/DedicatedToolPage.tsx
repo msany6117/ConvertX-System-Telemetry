@@ -85,9 +85,24 @@ export const DedicatedToolPage: React.FC<DedicatedToolPageProps> = ({
           <span>Fast & Secure</span>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-          {tool.name} Converter
-        </h1>
+        {(() => {
+          const nameLower = tool.name.toLowerCase();
+          const displayTitle =
+            nameLower.endsWith('converter') ||
+            nameLower.endsWith('compressor') ||
+            nameLower.endsWith('resizer') ||
+            nameLower.endsWith('cropper') ||
+            nameLower.endsWith('suite') ||
+            nameLower.endsWith('tools')
+              ? tool.name
+              : `${tool.name} Converter`;
+
+          return (
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+              {displayTitle}
+            </h1>
+          );
+        })()}
 
         <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
           {tool.description}
