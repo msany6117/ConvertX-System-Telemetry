@@ -4,6 +4,8 @@ import { PDFDocument, degrees } from 'pdf-lib';
 import { spawn } from 'child_process';
 import JSZip from 'jszip';
 
+import { CONFIG } from '../config';
+
 export interface PDFOptions {
   action?: 'merge' | 'split' | 'rotate' | 'compress' | 'protect' | 'unlock' | 'to-images';
   pageRanges?: string; // e.g. "1,3,5-8"
@@ -32,7 +34,16 @@ export async function processPDF(
 
   // 2. PDF MERGE
   if (options.action === 'merge' || (options.additionalInputPaths && options.additionalInputPaths.length > 0)) {
-    const allPaths = [inputPath, ...(options.additionalInputPaths || [])];
+    const uploadDirResolved = path.resolve(CONFIG.DIR_UPLOAD);
+    const safeAdditional = (options.additionalInputPaths || [])
+      .map((p) => {
+        const safeBase = path.basename(p);
+        const resolved = path.resolve(uploadDirResolved, safeBase);
+        return resolved.startsWith(uploadDirResolved) ? resolved : null;
+      })
+      .filter((p): p is string => p !== null && fs.existsSync(p));
+
+    const allPaths = [inputPath, ...safeAdditional];
     const mergedPdf = await PDFDocument.create();
 
     for (const filePath of allPaths) {

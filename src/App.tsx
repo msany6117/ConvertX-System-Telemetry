@@ -12,7 +12,6 @@ import { HowItWorksSection } from './components/HowItWorksSection';
 import { ToolCategoriesSection } from './components/ToolCategoriesSection';
 import { TrustPrivacySection } from './components/TrustPrivacySection';
 import { FaqSection } from './components/FaqSection';
-import { PricingPage } from './components/PricingPage';
 import { ImageResizerTool } from './components/ImageResizerTool';
 import { ImageCropTool } from './components/ImageCropTool';
 import { PdfToolsView } from './components/PdfToolsView';
@@ -29,6 +28,7 @@ import { ImageConverterTool } from './components/ImageConverterTool';
 import { VideoConverterTool } from './components/VideoConverterTool';
 import { ImageToSvgTool } from './components/ImageToSvgTool';
 import { SvgToImageTool } from './components/SvgToImageTool';
+import { AIToolboxView } from './components/ai/AIToolboxView';
 import { TOOLS_LIST } from './data/tools';
 
 export default function App() {
@@ -92,12 +92,12 @@ export default function App() {
 
   // Determine which specialized tool or view to render based on currentRoute
   const renderContent = () => {
-    if (currentRoute === '/pricing') {
-      return <PricingPage onSelectPlan={() => navigateTo('/pricing')} />;
-    }
-
     if (currentRoute === '/admin') {
       return <AdminView />;
+    }
+
+    if (currentRoute === '/ai' || currentRoute.startsWith('/ai/')) {
+      return <AIToolboxView activeSubRoute={currentRoute} onNavigate={navigateTo} />;
     }
 
     if (currentRoute === '/about') {

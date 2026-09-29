@@ -23,7 +23,7 @@ export const FaqSection: React.FC = () => {
     {
       question: 'Is ConvertX free?',
       answer:
-        'Yes, ConvertX is completely free to use with generous 500 MB per-file limits, batch processing for up to 10 files simultaneously, and zero artificial delays. For heavy creators needing 2 GB files and dedicated parallel cloud workers, a Pro subscription is available.',
+        'Yes, ConvertX is 100% completely free to use for everyone with generous 500 MB per-file limits, batch processing for up to 10 files simultaneously, and zero artificial delays or paywalls.',
     },
     {
       question: 'Do I need an account?',
@@ -38,7 +38,7 @@ export const FaqSection: React.FC = () => {
     {
       question: 'What are the file size limits?',
       answer:
-        'The free tier allows single files up to 500 MB and batches of up to 10 files simultaneously. Pro accounts can upload files up to 2 GB with unlimited simultaneous conversions.',
+        'You can upload single files up to 500 MB and process batches of up to 10 files simultaneously, completely free with no restrictions.',
     },
   ];
 

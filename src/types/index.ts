@@ -39,5 +39,5 @@ export interface ToolItem {
   defaultTarget?: string;
 }
 
-export type Language = 'en' | 'bn';
+export type Language = 'en' | 'bn' | 'es' | 'hi' | 'ar';
 export type Theme = 'light' | 'dark';

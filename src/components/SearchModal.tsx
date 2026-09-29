@@ -55,18 +55,31 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, selectedIndex]);
 
+  const allItems = [
+    { id: 'ai-hub', name: 'ConvertX AI Suite (Overview)', route: '/ai', category: 'ai', description: 'All-in-one AI tools with triple provider failover redundancy', inputFormats: ['ai'], outputFormats: ['ai'] },
+    { id: 'ai-translate', name: 'AI Translator (14+ Languages)', route: '/ai/translate', category: 'ai', description: 'Multilingual translation with paragraph preservation', inputFormats: ['text'], outputFormats: ['text'] },
+    { id: 'ai-rewrite', name: 'AI Rewrite & Paraphrase', route: '/ai/rewrite', category: 'ai', description: 'Rewrite in professional, casual, marketing, or simple tone', inputFormats: ['text'], outputFormats: ['text'] },
+    { id: 'ai-summarize', name: 'AI Document Summarizer', route: '/ai/summarize', category: 'ai', description: 'Summarize documents, papers, and PDFs into bullet points', inputFormats: ['pdf', 'docx', 'txt'], outputFormats: ['text'] },
+    { id: 'ai-grammar', name: 'AI Grammar & Clarity Fixer', route: '/ai/grammar', category: 'ai', description: 'Fix grammar, spelling, punctuation, and phrasing', inputFormats: ['text'], outputFormats: ['text'] },
+    { id: 'ai-analyzer', name: 'AI Text & Tone Analyzer', route: '/ai/analyzer', category: 'ai', description: 'Evaluate reading level, sentiment, and keywords', inputFormats: ['text'], outputFormats: ['json'] },
+    { id: 'ai-content', name: 'AI Content & Copy Generator', route: '/ai/content-generator', category: 'ai', description: 'Generate blogs, SEO titles, ad copy, and product descriptions', inputFormats: ['text'], outputFormats: ['markdown'] },
+    { id: 'ai-code', name: 'AI Code Assistant & Optimizer', route: '/ai/code-assistant', category: 'ai', description: 'Debug, optimize, explain, and convert code between languages', inputFormats: ['code'], outputFormats: ['code'] },
+    { id: 'ai-chat', name: 'Ask ConvertX AI (Chat Assistant)', route: '/ai/chat', category: 'ai', description: 'Interactive conversational AI assistant', inputFormats: ['chat'], outputFormats: ['chat'] },
+    ...TOOLS_LIST,
+  ];
+
   const filtered = query.trim()
-    ? TOOLS_LIST.filter((tool) => {
+    ? allItems.filter((tool) => {
         const q = query.toLowerCase();
         return (
           tool.name.toLowerCase().includes(q) ||
           tool.description.toLowerCase().includes(q) ||
-          tool.inputFormats.some((f) => f.includes(q)) ||
-          tool.outputFormats.some((f) => f.includes(q)) ||
+          (tool.inputFormats && tool.inputFormats.some((f: string) => f.includes(q))) ||
+          (tool.outputFormats && tool.outputFormats.some((f: string) => f.includes(q))) ||
           tool.category.includes(q)
         );
       }).slice(0, 10)
-    : TOOLS_LIST.slice(0, 8);
+    : allItems.slice(0, 8);
 
   const handleSelect = (route: string) => {
     onSelectTool(route);

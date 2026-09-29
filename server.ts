@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
@@ -7,6 +8,19 @@ import { CONFIG } from './server/config';
 async function startServer() {
   const app = express();
   const PORT = CONFIG.PORT;
+
+  // Security: disable x-powered-by to prevent fingerprinting
+  app.disable('x-powered-by');
+
+  // Security: Apply strict HTTP response headers
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
 
   // Basic security and parsing middlewares
   app.use(express.json({ limit: '10mb' }));
@@ -26,6 +40,16 @@ async function startServer() {
 
   // Mount API Router
   app.use('/api', apiRouter);
+
+  // Global API error handler (prevent stack leakage)
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('[ConvertX Server Error]', err);
+    if (res.headersSent) return;
+    res.status(err.status || 500).json({
+      error: 'An internal server error occurred.',
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (err.message || 'Error'),
+    });
+  });
 
   // Vite middleware for development or static serving for production
   if (process.env.NODE_ENV !== 'production') {

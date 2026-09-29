@@ -1,6 +1,6 @@
 {
   "name": "ConvertX",
-  "description": "Convert, Compress & Edit Files — Free online file conversion platform for video, audio, image, PDF, documents, archives, and units.",
+  "description": "ConvertX — All-in-One File Converter & Multi-Provider AI Toolbox. Convert, compress, edit files, and generate translations, summaries, code, and copy with automated multi-AI failover.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

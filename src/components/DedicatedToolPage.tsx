@@ -2,6 +2,7 @@ import React from 'react';
 import { UniversalUploader } from './UniversalUploader';
 import { ToolItem, Language } from '../types';
 import { TOOLS_LIST } from '../data/tools';
+import { getTranslation } from '../locales';
 import {
   ChevronRight,
   ShieldCheck,
@@ -24,18 +25,19 @@ export const DedicatedToolPage: React.FC<DedicatedToolPageProps> = ({
   language,
   onNavigate,
 }) => {
+  const t = getTranslation(language);
   const relatedTools = TOOLS_LIST.filter(
     (t) => t.category === tool.category && t.id !== tool.id
   ).slice(0, 4);
 
   const categoryNames: Record<string, { label: string; route: string }> = {
-    image: { label: 'Image Tools', route: '/image' },
-    video: { label: 'Video Tools', route: '/video' },
-    audio: { label: 'Audio Tools', route: '/audio' },
-    pdf: { label: 'PDF Tools', route: '/pdf' },
-    document: { label: 'Document Tools', route: '/documents' },
-    compression: { label: 'Compression Tools', route: '/compress' },
-    utility: { label: 'Utilities', route: '/tools' },
+    image: { label: `${t.nav.image} Tools`, route: '/image' },
+    video: { label: `${t.nav.video} Tools`, route: '/video' },
+    audio: { label: `${t.nav.audio} Tools`, route: '/audio' },
+    pdf: { label: `${t.nav.pdf} Tools`, route: '/pdf' },
+    document: { label: `${t.nav.documents} Tools`, route: '/documents' },
+    compression: { label: `${t.nav.compress} Tools`, route: '/compress' },
+    utility: { label: t.nav.tools, route: '/tools' },
   };
 
   const catInfo = categoryNames[tool.category] || { label: 'Tools', route: '/tools' };
@@ -179,7 +181,7 @@ export const DedicatedToolPage: React.FC<DedicatedToolPageProps> = ({
           </div>
           <div>
             <span className="font-semibold text-slate-900 dark:text-white">Max File Size: </span>
-            <span>500 MB (Free) / 2 GB (Pro)</span>
+            <span>500 MB Per File (100% Free)</span>
           </div>
           <div>
             <span className="font-semibold text-slate-900 dark:text-white">Security: </span>

@@ -11,6 +11,10 @@ import { CONFIG } from './config';
 import { sanitizeFilename, generateUniqueId, validateSafeUrl, rateLimitMiddleware } from './security';
 import { CONVERSION_REGISTRY } from './registry';
 import { jobQueue } from './jobQueue';
+import { aiRouter } from './ai/router';
+import { aiUsageTracker } from './ai/usageTracker';
+import { extractTextFromFile } from './ai/fileExtractor';
+import { AITaskType, AIProviderId } from './ai/types';
 
 export const apiRouter = express.Router();
 
@@ -333,3 +337,222 @@ apiRouter.delete('/files/:id', (req: Request, res: Response) => {
     res.status(404).json({ error: 'Job or files not found.' });
   }
 });
+
+// ====================================================================
+// 12. MULTI-PROVIDER AI SYSTEM ENDPOINTS (/api/ai/*)
+// ====================================================================
+
+const AIProcessSchema = z.object({
+  task: z.enum([
+    'translate',
+    'rewrite',
+    'summarize',
+    'grammar',
+    'analyzer',
+    'content',
+    'code',
+    'chat',
+    'file_process',
+  ]),
+  input: z.string().min(1, 'Input text cannot be empty.').max(100000, 'Input exceeds limit.'),
+  options: z.record(z.string(), z.any()).optional(),
+  preferredProvider: z.enum(['gemini', 'deepseek', 'groq', 'openai', 'anthropic']).optional(),
+});
+
+// 12.1 Task Processing with Failover (Translate, Rewrite, Summarize, Code, etc.)
+apiRouter.post('/ai/process', async (req: Request, res: Response) => {
+  const parsed = AIProcessSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Invalid request parameters.',
+      details: parsed.error.issues.map((i) => i.message).join(', '),
+    });
+    return;
+  }
+
+  const clientId = req.ip || 'anonymous';
+  const { task, input, options, preferredProvider } = parsed.data;
+
+  // Quota & length check
+  const quota = aiUsageTracker.checkQuota(clientId, input.length);
+  if (!quota.allowed) {
+    res.status(429).json({
+      error: quota.reason,
+      remainingRequests: quota.remainingRequests,
+    });
+    return;
+  }
+
+  try {
+    const response = await aiRouter.processTask(
+      task as AITaskType,
+      input,
+      options || {},
+      preferredProvider as AIProviderId
+    );
+
+    // Record usage
+    const tokens = (response.usage?.inputTokens || 0) + (response.usage?.outputTokens || 0);
+    aiUsageTracker.recordUsage(clientId, tokens);
+
+    res.json({
+      ...response,
+      remainingRequests: quota.remainingRequests - 1,
+    });
+  } catch (err: any) {
+    console.error(`[AI Process Error: ${task}]`, err.message);
+    const statusCode = err.status || 503;
+    res.status(statusCode).json({
+      error: err.message || 'AI service is temporarily unavailable. Please try again shortly.',
+      attempts: err.attempts,
+    });
+  }
+});
+
+// 12.2 Conversational AI Chat ("Ask ConvertX AI")
+const AIChatSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant', 'system']),
+        content: z.string().min(1).max(50000),
+      })
+    )
+    .min(1),
+  options: z.record(z.string(), z.any()).optional(),
+  preferredProvider: z.enum(['gemini', 'deepseek', 'groq', 'openai', 'anthropic']).optional(),
+});
+
+apiRouter.post('/ai/chat', async (req: Request, res: Response) => {
+  const parsed = AIChatSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid chat request payload.' });
+    return;
+  }
+
+  const clientId = req.ip || 'anonymous';
+  const { messages, options, preferredProvider } = parsed.data;
+  const lastUserMsg = messages[messages.length - 1]?.content || '';
+
+  const quota = aiUsageTracker.checkQuota(clientId, lastUserMsg.length);
+  if (!quota.allowed) {
+    res.status(429).json({ error: quota.reason });
+    return;
+  }
+
+  try {
+    const response = await aiRouter.processChat(
+      messages,
+      options || {},
+      preferredProvider as AIProviderId
+    );
+
+    aiUsageTracker.recordUsage(clientId);
+
+    res.json({
+      ...response,
+      remainingRequests: quota.remainingRequests - 1,
+    });
+  } catch (err: any) {
+    console.error('[AI Chat Error]', err.message);
+    res.status(503).json({
+      error: err.message || 'AI chat engine is temporarily busy. Please try again.',
+    });
+  }
+});
+
+// 12.3 AI File Processing (PDF, DOCX, TXT, CSV, Code files)
+apiRouter.post('/ai/file-process', upload.single('file'), async (req: Request, res: Response) => {
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: 'No file uploaded for AI analysis.' });
+    return;
+  }
+
+  const clientId = req.ip || 'anonymous';
+  const task = (req.body.task as AITaskType) || 'file_process';
+  let options: any = {};
+  if (req.body.options) {
+    try {
+      options = typeof req.body.options === 'string' ? JSON.parse(req.body.options) : req.body.options;
+    } catch {
+      // ignore
+    }
+  }
+
+  const filePath = file.path;
+  try {
+    // Extract text from uploaded document
+    const extractedText = await extractTextFromFile(filePath, file.originalname);
+
+    // Delete uploaded temp file immediately for privacy
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    const quota = aiUsageTracker.checkQuota(clientId, extractedText.length);
+    if (!quota.allowed) {
+      res.status(429).json({ error: quota.reason });
+      return;
+    }
+
+    const response = await aiRouter.processTask(
+      task,
+      extractedText,
+      options,
+      req.body.preferredProvider as AIProviderId
+    );
+
+    aiUsageTracker.recordUsage(clientId);
+
+    res.json({
+      ...response,
+      originalFilename: file.originalname,
+      extractedCharCount: extractedText.length,
+    });
+  } catch (err: any) {
+    // Ensure file is scrubbed on error
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        // ignore
+      }
+    }
+    console.error('[AI File Process Error]', err.message);
+    res.status(500).json({
+      error: err.message || 'Failed to analyze file with ConvertX AI.',
+    });
+  }
+});
+
+// 12.4 AI Provider Health & Status Dashboard Data
+apiRouter.get('/ai/providers', (req: Request, res: Response) => {
+  const clientId = req.ip || 'anonymous';
+  const dashboard = aiRouter.getDashboardData();
+  const userQuota = aiUsageTracker.getStatsForClient(clientId);
+
+  res.json({
+    ...dashboard,
+    userQuota,
+  });
+});
+
+// 12.5 AI Admin Configuration Update
+apiRouter.post('/ai/admin/config', (req: Request, res: Response) => {
+  const { priority, enabled, models, timeoutMs, cooldownSeconds } = req.body;
+  aiRouter.updateConfig({ priority, enabled, models, timeoutMs, cooldownSeconds });
+  res.json({ success: true, message: 'AI configuration updated.', state: aiRouter.getDashboardData() });
+});
+
+// 12.6 Reset Cooldown Manually
+apiRouter.post('/ai/admin/reset-cooldown', (req: Request, res: Response) => {
+  const { provider } = req.body;
+  if (!provider) {
+    res.status(400).json({ error: 'Provider ID is required.' });
+    return;
+  }
+  const reset = aiRouter.resetCooldown(provider as AIProviderId);
+  res.json({ success: reset, message: `Cooldown reset for ${provider}` });
+});
+
