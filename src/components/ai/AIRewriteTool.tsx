@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { AIProviderStatusBadge } from './AIProviderStatusBadge';
 import { AIFileUploadZone } from './AIFileUploadZone';
+import { runAIProcess } from '../../services/aiClient';
 
 const TONES = [
   { id: 'Professional', label: 'Professional', desc: 'Crisp, articulate business standard' },
@@ -45,18 +46,11 @@ export const AIRewriteTool: React.FC = () => {
     setError(null);
 
     try {
-      const res = await fetch('/api/ai/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task: 'rewrite',
-          input: text,
-          options: { tone: selectedTone },
-        }),
+      const data = await runAIProcess({
+        task: 'rewrite',
+        input: text,
+        options: { tone: selectedTone },
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Rewrite failed.');
 
       setOutputText(data.result || '');
       setLastProvider(data.provider);

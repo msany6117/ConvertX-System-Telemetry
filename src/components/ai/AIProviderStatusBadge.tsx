@@ -7,6 +7,8 @@ interface AIProviderStatusBadgeProps {
   switchedEngine?: boolean;
 }
 
+import { fetchAIProvidersStatus } from '../../services/aiClient';
+
 export const AIProviderStatusBadge: React.FC<AIProviderStatusBadgeProps> = ({
   lastProviderUsed,
   lastModelUsed,
@@ -16,8 +18,7 @@ export const AIProviderStatusBadge: React.FC<AIProviderStatusBadgeProps> = ({
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    fetch('/api/ai/providers')
-      .then((r) => r.json())
+    fetchAIProvidersStatus()
       .then((d) => setData(d))
       .catch(() => {});
   }, [lastProviderUsed]);

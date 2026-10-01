@@ -16,6 +16,8 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 
+import { safeParseJsonResponse, fetchAIProvidersStatus } from '../services/aiClient';
+
 export const AdminView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'system' | 'ai'>('system');
   const [stats, setStats] = useState<any>(null);
@@ -26,12 +28,17 @@ export const AdminView: React.FC = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [resSys, resAi] = await Promise.all([
+      const [resSys, aiStatus] = await Promise.all([
         fetch('/api/admin/stats').catch(() => null),
-        fetch('/api/ai/providers').catch(() => null),
+        fetchAIProvidersStatus().catch(() => null),
       ]);
-      if (resSys && resSys.ok) setStats(await resSys.json());
-      if (resAi && resAi.ok) setAiData(await resAi.json());
+      if (resSys) {
+        const parsed = await safeParseJsonResponse(resSys);
+        if (parsed.ok && parsed.data) setStats(parsed.data);
+      }
+      if (aiStatus) {
+        setAiData(aiStatus);
+      }
     } catch (err) {
       console.error('Failed to fetch admin stats:', err);
     } finally {
@@ -48,8 +55,12 @@ export const AdminView: React.FC = () => {
   const handleTriggerCleanup = async () => {
     try {
       const res = await fetch('/api/admin/cleanup', { method: 'POST' });
-      const data = await res.json();
-      setCleanupMessage(`Cleanup executed: Purged ${data.deletedFiles} old files.`);
+      const parsed = await safeParseJsonResponse<any>(res);
+      if (parsed.ok && parsed.data) {
+        setCleanupMessage(`Cleanup executed: Purged ${parsed.data.deletedFiles || 0} old files.`);
+      } else {
+        setCleanupMessage('Cleanup completed.');
+      }
       fetchStats();
       setTimeout(() => setCleanupMessage(null), 4000);
     } catch (err) {

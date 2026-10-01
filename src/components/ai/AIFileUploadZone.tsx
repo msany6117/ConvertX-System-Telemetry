@@ -6,6 +6,8 @@ interface AIFileUploadZoneProps {
   disabled?: boolean;
 }
 
+import { safeParseJsonResponse } from '../../services/aiClient';
+
 export const AIFileUploadZone: React.FC<AIFileUploadZoneProps> = ({ onTextExtracted, disabled }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -18,23 +20,41 @@ export const AIFileUploadZone: React.FC<AIFileUploadZoneProps> = ({ onTextExtrac
     setIsUploading(true);
     setCurrentFile(file.name);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('task', 'file_process');
-
+    // 1. Try server extraction
     try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('task', 'file_process');
+
       const res = await fetch('/api/ai/file-process', {
         method: 'POST',
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to extract text from file.');
+      const parsed = await safeParseJsonResponse<any>(res);
+      if (parsed.ok && parsed.data && parsed.data.result) {
+        onTextExtracted(parsed.data.result, file.name);
+        return;
+      }
+    } catch {
+      // Server call failed, try client-side extraction below
+    }
+
+    // 2. Client-side fallback for text/csv/markdown/code formats
+    try {
+      const isTextFile =
+        file.type.startsWith('text/') ||
+        file.name.match(/\.(txt|csv|md|json|js|jsx|ts|tsx|html|xml|yaml|yml|log|rtf)$/i);
+
+      if (isTextFile) {
+        const textContent = await file.text();
+        onTextExtracted(textContent, file.name);
+        return;
       }
 
-      // If response has result, pass it back
-      onTextExtracted(data.result || '', file.name);
+      throw new Error(
+        'For PDF and Word documents on static hosting, please copy and paste the text directly into the input area.'
+      );
     } catch (err: any) {
       setError(err.message || 'Error processing document');
     } finally {

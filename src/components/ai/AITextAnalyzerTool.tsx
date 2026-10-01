@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { AIProviderStatusBadge } from './AIProviderStatusBadge';
 import { AIFileUploadZone } from './AIFileUploadZone';
+import { runAIProcess } from '../../services/aiClient';
 
 export const AITextAnalyzerTool: React.FC = () => {
   const [inputText, setInputText] = useState('');
@@ -35,28 +36,16 @@ export const AITextAnalyzerTool: React.FC = () => {
     setAnalysis(null);
 
     try {
-      const res = await fetch('/api/ai/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task: 'analyzer',
-          input: text,
-        }),
+      const data = await runAIProcess({
+        task: 'analyzer',
+        input: text,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Text analysis failed.');
-
-      if (data.structuredData) {
-        setAnalysis(data.structuredData);
-      } else {
-        // Fallback parse attempt
-        try {
-          const parsed = JSON.parse(data.result);
-          setAnalysis(parsed);
-        } catch {
-          setAnalysis({ summary: data.result });
-        }
+      try {
+        const parsed = JSON.parse(data.result);
+        setAnalysis(parsed);
+      } catch {
+        setAnalysis({ summary: data.result });
       }
 
       setLastProvider(data.provider);

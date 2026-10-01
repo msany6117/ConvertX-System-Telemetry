@@ -18,8 +18,8 @@ export interface AIConfigState {
 export const AI_CONFIG: AIConfigState = {
   priority: (process.env.AI_PROVIDER_PRIORITY
     ? process.env.AI_PROVIDER_PRIORITY.split(',').map((p) => p.trim() as AIProviderId)
-    : ['gemini', 'deepseek', 'groq']
-  ).filter((p): p is AIProviderId => ['gemini', 'deepseek', 'groq'].includes(p)),
+    : ['groq', 'gemini', 'deepseek']
+  ).filter((p): p is AIProviderId => ['groq', 'gemini', 'deepseek'].includes(p)),
 
   models: {
     gemini: process.env.GEMINI_MODEL || 'gemini-3.8-flash',

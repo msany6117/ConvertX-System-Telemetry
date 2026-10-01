@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { AIProviderStatusBadge } from './AIProviderStatusBadge';
 import { AIFileUploadZone } from './AIFileUploadZone';
+import { runAIProcess } from '../../services/aiClient';
 
 const ACTIONS = [
   { id: 'explain', label: 'Explain Code', icon: FileCode, desc: 'Step-by-step breakdown of how code executes' },
@@ -60,21 +61,14 @@ export const AICodeAssistantTool: React.FC = () => {
     setError(null);
 
     try {
-      const res = await fetch('/api/ai/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task: 'code',
-          input: code,
-          options: {
-            codeAction: selectedAction,
-            targetLanguageCode: targetLang,
-          },
-        }),
+      const data = await runAIProcess({
+        task: 'code',
+        input: code,
+        options: {
+          codeAction: selectedAction,
+          targetLanguageCode: targetLang,
+        },
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Code processing failed.');
 
       setOutputResult(data.result || '');
       setLastProvider(data.provider);
