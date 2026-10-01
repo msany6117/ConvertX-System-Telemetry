@@ -1,8 +1,17 @@
 import fs from 'fs';
 import path from 'path';
-import sharp from 'sharp';
 import { spawn } from 'child_process';
 import { PDFDocument } from 'pdf-lib';
+
+async function getSharp(): Promise<any> {
+  try {
+    const s = await import('sharp');
+    return (s as any).default || s;
+  } catch (e) {
+    console.warn('[ImageProcessor] Sharp native binary not available:', (e as any)?.message);
+    return null;
+  }
+}
 
 export interface ImageOptions {
   quality?: number; // 1-100
@@ -40,9 +49,14 @@ export async function processImage(
     } else if (ext === '.png') {
       embeddedImg = await pdfDoc.embedPng(imageBytes);
     } else {
-      // Transcode to PNG buffer using sharp
-      const pngBuffer = await sharp(inputPath).png().toBuffer();
-      embeddedImg = await pdfDoc.embedPng(pngBuffer);
+      // Transcode to PNG buffer using sharp if available
+      const sharp = await getSharp();
+      if (sharp) {
+        const pngBuffer = await sharp(inputPath).png().toBuffer();
+        embeddedImg = await pdfDoc.embedPng(pngBuffer);
+      } else {
+        throw new Error('Image transcoding requires sharp engine which is not available in this environment.');
+      }
     }
 
     const { width, height } = embeddedImg.scale(1);
@@ -61,6 +75,10 @@ export async function processImage(
 
   // Case 2: Standard Image processing via Sharp
   try {
+    const sharp = await getSharp();
+    if (!sharp) {
+      throw new Error('Sharp is not available, fallback to ImageMagick.');
+    }
     let pipeline = sharp(inputPath, { failOn: 'none' });
 
     // Rotate / Flip

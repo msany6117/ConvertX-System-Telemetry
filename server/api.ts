@@ -5,8 +5,6 @@ import fs from 'fs';
 import https from 'https';
 import http from 'http';
 import { z } from 'zod';
-import * as archiverModule from 'archiver';
-const archiver = (archiverModule as any).default || archiverModule;
 import { CONFIG } from './config';
 import { sanitizeFilename, generateUniqueId, validateSafeUrl, rateLimitMiddleware } from './security';
 import { CONVERSION_REGISTRY } from './registry';
@@ -300,13 +298,15 @@ const DownloadZipSchema = z.object({
   jobIds: z.array(z.string()).min(1),
 });
 
-apiRouter.post('/download-zip', (req: Request, res: Response) => {
+apiRouter.post('/download-zip', async (req: Request, res: Response) => {
   const parsed = DownloadZipSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid job IDs.' });
     return;
   }
 
+  const archiverModule: any = await import('archiver');
+  const archiver = archiverModule.default || archiverModule;
   const archive = archiver('zip', { zlib: { level: 6 } });
   res.attachment('ConvertX_Package.zip');
   archive.pipe(res);

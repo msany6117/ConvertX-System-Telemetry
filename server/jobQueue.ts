@@ -38,8 +38,11 @@ class JobQueue {
   private queue: string[] = [];
 
   constructor() {
-    // Schedule periodic garbage collection
-    setInterval(() => this.cleanupExpired(), 5 * 60 * 1000);
+    // Schedule periodic garbage collection only in non-serverless long-running environments
+    if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      const interval = setInterval(() => this.cleanupExpired(), 5 * 60 * 1000);
+      if (interval.unref) interval.unref();
+    }
   }
 
   public createJob(params: {
