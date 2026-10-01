@@ -21,7 +21,12 @@ export async function safeFetchJson<T = any>(
   if (!res.ok) {
     if (res.status === 404 || res.status === 405) {
       throw new Error(
-        `API endpoint returned HTTP ${res.status}. If deployed on Vercel, make sure GEMINI_API_KEY is configured in Vercel Project Settings > Environment Variables.`
+        `API route not found (HTTP ${res.status}). Please make sure Vercel has deployed the /api endpoint.`
+      );
+    }
+    if (text && text.includes('FUNCTION_INVOCATION_FAILED')) {
+      throw new Error(
+        'Vercel function invocation failed. Please redeploy using the updated api/index.js bundle.'
       );
     }
     const message =

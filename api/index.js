@@ -2894,13 +2894,30 @@ function createApp() {
 var app = createApp();
 var app_default = app;
 
-// api/index.ts
+// server/vercelEntry.ts
 function handler(req, res) {
   if (req.query && req.query.path) {
     const subpath = Array.isArray(req.query.path) ? req.query.path.join("/") : req.query.path;
     req.url = subpath.startsWith("/") ? subpath : `/${subpath}`;
   }
   return new Promise((resolve) => {
+    let settled = false;
+    const finalize = () => {
+      if (!settled) {
+        settled = true;
+        resolve(true);
+      }
+    };
+    if (res.on) {
+      res.on("finish", finalize);
+      res.on("close", finalize);
+    }
+    const originalEnd = res.end;
+    res.end = function(...args) {
+      const ret = originalEnd.apply(this, args);
+      finalize();
+      return ret;
+    };
     app_default(req, res, (err) => {
       if (err) {
         console.error("[Vercel Serverless Error]", err);
@@ -2914,7 +2931,7 @@ function handler(req, res) {
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify({ error: `Route not found on server: ${req.url}` }));
       }
-      resolve(true);
+      finalize();
     });
   });
 }
