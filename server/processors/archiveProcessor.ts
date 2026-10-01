@@ -1,13 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import JSZip from 'jszip';
-import * as archiverModule from 'archiver';
-const archiver = (archiverModule as any).default || archiverModule;
 
 export async function createZipArchive(
   files: Array<{ sourcePath: string; entryName: string }>,
   outputPath: string
 ): Promise<void> {
+  const archiverModule: any = await import('archiver');
+  const archiver = archiverModule.default || archiverModule;
+
   return new Promise((resolve, reject) => {
     const output = fs.createWriteStream(outputPath);
     const archive = archiver('zip', { zlib: { level: 6 } });

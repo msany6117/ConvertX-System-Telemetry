@@ -11,7 +11,6 @@ export function createApp() {
   // Security: Apply HTTP response headers compatible with AI Studio iframe preview and Vercel
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.removeHeader('X-Frame-Options');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 

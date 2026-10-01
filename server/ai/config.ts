@@ -37,7 +37,7 @@ export const AI_CONFIG: AIConfigState = {
     anthropic: false,
   },
 
-  timeoutMs: parseInt(process.env.AI_TIMEOUT_MS || '25000', 10),
+  timeoutMs: parseInt(process.env.AI_TIMEOUT_MS || (process.env.VERCEL ? '7500' : '20000'), 10),
   maxRetriesPerProvider: parseInt(process.env.AI_MAX_RETRIES || '1', 10),
   cooldownSeconds: parseInt(process.env.AI_COOLDOWN_SECONDS || '60', 10),
   temperature: parseFloat(process.env.AI_TEMPERATURE || '0.7'),

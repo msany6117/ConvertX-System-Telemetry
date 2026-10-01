@@ -6,7 +6,7 @@ import https from 'https';
 import http from 'http';
 import { z } from 'zod';
 import { CONFIG } from './config';
-import { sanitizeFilename, generateUniqueId, validateSafeUrl, rateLimitMiddleware } from './security';
+import { sanitizeFilename, generateUniqueId, validateSafeUrl, rateLimitMiddleware, getClientIp } from './security';
 import { CONVERSION_REGISTRY } from './registry';
 import { jobQueue } from './jobQueue';
 import { aiRouter } from './ai/router';
@@ -370,7 +370,7 @@ apiRouter.post('/ai/process', async (req: Request, res: Response) => {
     return;
   }
 
-  const clientId = req.ip || 'anonymous';
+  const clientId = getClientIp(req);
   const { task, input, options, preferredProvider } = parsed.data;
 
   // Quota & length check
@@ -430,7 +430,7 @@ apiRouter.post('/ai/chat', async (req: Request, res: Response) => {
     return;
   }
 
-  const clientId = req.ip || 'anonymous';
+  const clientId = getClientIp(req);
   const { messages, options, preferredProvider } = parsed.data;
   const lastUserMsg = messages[messages.length - 1]?.content || '';
 
@@ -469,7 +469,7 @@ apiRouter.post('/ai/file-process', upload.single('file'), async (req: Request, r
     return;
   }
 
-  const clientId = req.ip || 'anonymous';
+  const clientId = getClientIp(req);
   const task = (req.body.task as AITaskType) || 'file_process';
   let options: any = {};
   if (req.body.options) {
@@ -528,7 +528,7 @@ apiRouter.post('/ai/file-process', upload.single('file'), async (req: Request, r
 
 // 12.4 AI Provider Health & Status Dashboard Data
 apiRouter.get('/ai/providers', (req: Request, res: Response) => {
-  const clientId = req.ip || 'anonymous';
+  const clientId = getClientIp(req);
   const dashboard = aiRouter.getDashboardData();
   const userQuota = aiUsageTracker.getStatsForClient(clientId);
 

@@ -108,8 +108,22 @@ interface RateRecord {
 }
 const ipRateMap = new Map<string, RateRecord>();
 
+export function getClientIp(req: Request): string {
+  const xff = req.headers ? (req.headers['x-forwarded-for'] as string) : undefined;
+  if (xff && typeof xff === 'string') {
+    return xff.split(',')[0].trim();
+  }
+  if (req.socket && req.socket.remoteAddress) {
+    return req.socket.remoteAddress;
+  }
+  if ((req as any).connection && (req as any).connection.remoteAddress) {
+    return (req as any).connection.remoteAddress;
+  }
+  return '127.0.0.1';
+}
+
 export function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {
-  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
+  const ip = getClientIp(req);
   const now = Date.now();
 
   let record = ipRateMap.get(ip);
