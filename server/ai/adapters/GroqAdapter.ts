@@ -22,7 +22,7 @@ export class GroqAdapter extends BaseAdapter implements AIProviderAdapter {
   ];
 
   private getApiKey(): string {
-    return process.env.GROQ_API_KEY || '';
+    return process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || '';
   }
 
   isConfigured(): boolean {

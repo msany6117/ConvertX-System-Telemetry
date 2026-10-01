@@ -15,7 +15,7 @@ import {
 import { AIProviderStatusBadge } from './AIProviderStatusBadge';
 import { AIFileUploadZone } from './AIFileUploadZone';
 import { cleanTranslatedText } from '../../utils/aiTextCleaner';
-import { runAIProcess } from '../../services/aiClient';
+import { safeFetchJson } from '../../utils/apiClient';
 
 const LANGUAGES = [
   'Auto-detect',
@@ -88,22 +88,26 @@ export const AITranslatorTool: React.FC = () => {
       setError(null);
 
       try {
-        const response = await runAIProcess({
-          task: 'translate',
-          input: trimmed,
-          options: {
-            sourceLanguage: srcLang === 'Auto-detect' ? undefined : srcLang,
-            targetLanguage: tgtLang,
-          },
+        const data = await safeFetchJson('/api/ai/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            task: 'translate',
+            input: trimmed,
+            options: {
+              sourceLanguage: srcLang === 'Auto-detect' ? undefined : srcLang,
+              targetLanguage: tgtLang,
+            },
+          }),
           signal: controller.signal,
         });
 
         // Clean any quotes, triple quotes, markdown wrappers, JSON brackets, escape slashes, or symbol noise
-        const sanitizedResult = cleanTranslatedText(response.result || '');
+        const sanitizedResult = cleanTranslatedText(data.result || '');
         setOutputText(sanitizedResult);
-        setLastProvider(response.provider);
-        setLastModel(response.model);
-        setSwitched(Boolean(response.switchedEngine));
+        setLastProvider(data.provider);
+        setLastModel(data.model);
+        setSwitched(Boolean(data.switchedEngine));
         lastTranslatedKeyRef.current = cacheKey;
       } catch (err: any) {
         if (err.name === 'AbortError') {

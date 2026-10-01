@@ -2,64 +2,11 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { apiRouter } from './server/api';
+import { app } from './server/app';
 import { CONFIG } from './server/config';
 
 async function startServer() {
-  const app = express();
   const PORT = CONFIG.PORT;
-
-  // Security: disable x-powered-by to prevent fingerprinting
-  app.disable('x-powered-by');
-
-  // Security: Apply HTTP response headers compatible with AI Studio iframe preview
-  app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    // Ensure no X-Frame-Options blocks the parent AI Studio iframe
-    res.removeHeader('X-Frame-Options');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-
-    // CORS headers for API and preview integration
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-
-    if (req.method === 'OPTIONS') {
-      res.sendStatus(204);
-      return;
-    }
-    next();
-  });
-
-  // Basic security and parsing middlewares
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-  // Request logger
-  app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-      const duration = Date.now() - start;
-      if (req.originalUrl.startsWith('/api') && req.originalUrl !== '/api/stats') {
-        console.log(`[API] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`);
-      }
-    });
-    next();
-  });
-
-  // Mount API Router
-  app.use('/api', apiRouter);
-
-  // Global API error handler (prevent stack leakage)
-  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    console.error('[ConvertX Server Error]', err);
-    if (res.headersSent) return;
-    res.status(err.status || 500).json({
-      error: 'An internal server error occurred.',
-      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (err.message || 'Error'),
-    });
-  });
 
   // Vite middleware for development or static serving for production
   if (process.env.NODE_ENV !== 'production') {

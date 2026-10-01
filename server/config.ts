@@ -1,19 +1,26 @@
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+
+// Detect serverless environments (e.g. Vercel, AWS Lambda) where process.cwd() is read-only
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const baseStorageDir = isServerless
+  ? path.join(os.tmpdir(), 'convertx')
+  : path.resolve(process.cwd(), 'data');
 
 export const CONFIG = {
   PORT: parseInt(process.env.PORT || '3000', 10),
-  MAX_UPLOAD_SIZE_BYTES: (parseInt(process.env.MAX_UPLOAD_MB || '500', 10)) * 1024 * 1024, // 500 MB
+  MAX_UPLOAD_SIZE_BYTES: parseInt(process.env.MAX_UPLOAD_MB || '500', 10) * 1024 * 1024, // 500 MB
   MAX_SIMULTANEOUS_FILES: parseInt(process.env.MAX_SIMULTANEOUS_FILES || '10', 10),
   MAX_TOTAL_JOB_BYTES: 1024 * 1024 * 1024, // 1 GB
-  JOB_TIMEOUT_MS: (parseInt(process.env.JOB_TIMEOUT_SECONDS || '300', 10)) * 1000, // 5 minutes
-  FILE_RETENTION_MS: (parseInt(process.env.FILE_RETENTION_MINUTES || '60', 10)) * 60 * 1000, // 1 hour
+  JOB_TIMEOUT_MS: parseInt(process.env.JOB_TIMEOUT_SECONDS || '300', 10) * 1000, // 5 minutes
+  FILE_RETENTION_MS: parseInt(process.env.FILE_RETENTION_MINUTES || '60', 10) * 60 * 1000, // 1 hour
   MAX_CONCURRENT_JOBS: 3,
 
   // Storage directories
-  DIR_UPLOAD: path.resolve(process.cwd(), 'data', 'uploads'),
-  DIR_OUTPUT: path.resolve(process.cwd(), 'data', 'outputs'),
-  DIR_TEMP: path.resolve(process.cwd(), 'data', 'temp'),
+  DIR_UPLOAD: path.join(baseStorageDir, 'uploads'),
+  DIR_OUTPUT: path.join(baseStorageDir, 'outputs'),
+  DIR_TEMP: path.join(baseStorageDir, 'temp'),
 
   // Rate Limiting (per IP window)
   RATE_LIMIT_WINDOW_MS: 60 * 1000, // 1 minute
@@ -21,9 +28,13 @@ export const CONFIG = {
   RATE_LIMIT_MAX_JOBS_PER_MIN: 20, // 20 conversions submitted per minute
 };
 
-// Ensure directories exist
+// Ensure directories exist with safe fallback for read-only serverless filesystems
 for (const dir of [CONFIG.DIR_UPLOAD, CONFIG.DIR_OUTPUT, CONFIG.DIR_TEMP]) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  } catch (err) {
+    console.warn(`[ConvertX Config] Notice: Directory ${dir} could not be created automatically:`, err);
   }
 }

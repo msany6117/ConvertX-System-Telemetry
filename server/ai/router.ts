@@ -167,7 +167,7 @@ class AIRouter {
 
     if (candidates.length === 0) {
       throw new Error(
-        'No AI providers are currently configured or enabled. Please check API keys in server configuration.'
+        'No AI providers are currently configured. If running on Vercel, please add GEMINI_API_KEY (or DEEPSEEK_API_KEY / GROQ_API_KEY) in Vercel Project Settings > Environment Variables, then redeploy.'
       );
     }
 

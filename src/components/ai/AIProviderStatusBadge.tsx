@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu, ShieldCheck, Zap, RefreshCw, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { safeFetchJson } from '../../utils/apiClient';
 
 interface AIProviderStatusBadgeProps {
   lastProviderUsed?: string;
   lastModelUsed?: string;
   switchedEngine?: boolean;
 }
-
-import { fetchAIProvidersStatus } from '../../services/aiClient';
 
 export const AIProviderStatusBadge: React.FC<AIProviderStatusBadgeProps> = ({
   lastProviderUsed,
@@ -18,7 +17,7 @@ export const AIProviderStatusBadge: React.FC<AIProviderStatusBadgeProps> = ({
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    fetchAIProvidersStatus()
+    safeFetchJson('/api/ai/providers')
       .then((d) => setData(d))
       .catch(() => {});
   }, [lastProviderUsed]);

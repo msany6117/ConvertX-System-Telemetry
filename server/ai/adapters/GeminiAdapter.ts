@@ -24,7 +24,13 @@ export class GeminiAdapter extends BaseAdapter implements AIProviderAdapter {
   }
 
   private getApiKey(): string {
-    return process.env.GEMINI_API_KEY || '';
+    return (
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.GOOGLE_GENAI_API_KEY ||
+      process.env.VITE_GEMINI_API_KEY ||
+      ''
+    );
   }
 
   private initClient(): GoogleGenAI | null {

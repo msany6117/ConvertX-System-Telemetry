@@ -15,8 +15,7 @@ import {
   Clock,
   ArrowUpDown,
 } from 'lucide-react';
-
-import { safeParseJsonResponse, fetchAIProvidersStatus } from '../services/aiClient';
+import { safeFetchJson } from '../utils/apiClient';
 
 export const AdminView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'system' | 'ai'>('system');
@@ -28,17 +27,12 @@ export const AdminView: React.FC = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [resSys, aiStatus] = await Promise.all([
-        fetch('/api/admin/stats').catch(() => null),
-        fetchAIProvidersStatus().catch(() => null),
+      const [sysData, aiProviders] = await Promise.all([
+        safeFetchJson('/api/admin/stats').catch(() => null),
+        safeFetchJson('/api/ai/providers').catch(() => null),
       ]);
-      if (resSys) {
-        const parsed = await safeParseJsonResponse(resSys);
-        if (parsed.ok && parsed.data) setStats(parsed.data);
-      }
-      if (aiStatus) {
-        setAiData(aiStatus);
-      }
+      if (sysData) setStats(sysData);
+      if (aiProviders) setAiData(aiProviders);
     } catch (err) {
       console.error('Failed to fetch admin stats:', err);
     } finally {
@@ -54,13 +48,8 @@ export const AdminView: React.FC = () => {
 
   const handleTriggerCleanup = async () => {
     try {
-      const res = await fetch('/api/admin/cleanup', { method: 'POST' });
-      const parsed = await safeParseJsonResponse<any>(res);
-      if (parsed.ok && parsed.data) {
-        setCleanupMessage(`Cleanup executed: Purged ${parsed.data.deletedFiles || 0} old files.`);
-      } else {
-        setCleanupMessage('Cleanup completed.');
-      }
+      const data = await safeFetchJson('/api/admin/cleanup', { method: 'POST' });
+      setCleanupMessage(`Cleanup executed: Purged ${data?.deletedFiles ?? 0} old files.`);
       fetchStats();
       setTimeout(() => setCleanupMessage(null), 4000);
     } catch (err) {
@@ -70,14 +59,12 @@ export const AdminView: React.FC = () => {
 
   const handleResetCooldown = async (providerId: string) => {
     try {
-      const res = await fetch('/api/ai/admin/reset-cooldown', {
+      await safeFetchJson('/api/ai/admin/reset-cooldown', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: providerId }),
       });
-      if (res.ok) {
-        fetchStats();
-      }
+      fetchStats();
     } catch (e) {
       console.error(e);
     }
@@ -85,7 +72,7 @@ export const AdminView: React.FC = () => {
 
   const handleToggleProvider = async (providerId: string, currentEnabled: boolean) => {
     try {
-      await fetch('/api/ai/admin/config', {
+      await safeFetchJson('/api/ai/admin/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

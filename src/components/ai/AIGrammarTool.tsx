@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { AIProviderStatusBadge } from './AIProviderStatusBadge';
 import { AIFileUploadZone } from './AIFileUploadZone';
-import { runAIProcess } from '../../services/aiClient';
+import { safeFetchJson } from '../../utils/apiClient';
 
 export const AIGrammarTool: React.FC = () => {
   const [inputText, setInputText] = useState('');
@@ -35,21 +35,18 @@ export const AIGrammarTool: React.FC = () => {
     setStructuredData(null);
 
     try {
-      const data = await runAIProcess({
-        task: 'grammar',
-        input: text,
+      const data = await safeFetchJson('/api/ai/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: 'grammar',
+          input: text,
+        }),
       });
 
-      let parsedJson: any = null;
-      try {
-        if (data.result.trim().startsWith('{')) {
-          parsedJson = JSON.parse(data.result.trim());
-        }
-      } catch {}
-
-      if (parsedJson && parsedJson.corrected) {
-        setCorrectedText(parsedJson.corrected);
-        setStructuredData(parsedJson);
+      if (data.structuredData && data.structuredData.corrected) {
+        setCorrectedText(data.structuredData.corrected);
+        setStructuredData(data.structuredData);
       } else {
         setCorrectedText(data.result || '');
       }

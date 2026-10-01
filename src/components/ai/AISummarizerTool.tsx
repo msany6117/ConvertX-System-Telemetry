@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { AIProviderStatusBadge } from './AIProviderStatusBadge';
 import { AIFileUploadZone } from './AIFileUploadZone';
-import { runAIProcess } from '../../services/aiClient';
+import { safeFetchJson } from '../../utils/apiClient';
 
 const STYLES = [
   { id: 'short', label: 'Short', desc: '1-2 sentence quick executive takeaway' },
@@ -48,10 +48,14 @@ export const AISummarizerTool: React.FC = () => {
     setError(null);
 
     try {
-      const data = await runAIProcess({
-        task: 'summarize',
-        input: text,
-        options: { summaryStyle: selectedStyle },
+      const data = await safeFetchJson('/api/ai/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: 'summarize',
+          input: text,
+          options: { summaryStyle: selectedStyle },
+        }),
       });
 
       setOutputText(data.result || '');

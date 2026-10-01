@@ -11,7 +11,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { AIProviderStatusBadge } from './AIProviderStatusBadge';
-import { runAIProcess } from '../../services/aiClient';
+import { safeFetchJson } from '../../utils/apiClient';
 
 const TEMPLATES = [
   'Blog post',
@@ -59,17 +59,21 @@ export const AIContentGeneratorTool: React.FC = () => {
       .filter(Boolean);
 
     try {
-      const data = await runAIProcess({
-        task: 'content',
-        input: additionalNotes || topic,
-        options: {
-          contentType: template,
-          topic,
-          tone,
-          length,
-          targetLanguage: language,
-          keywords: keywordList,
-        },
+      const data = await safeFetchJson('/api/ai/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: 'content',
+          input: additionalNotes || topic,
+          options: {
+            contentType: template,
+            topic,
+            tone,
+            length,
+            targetLanguage: language,
+            keywords: keywordList,
+          },
+        }),
       });
 
       setGeneratedContent(data.result || '');

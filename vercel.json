@@ -4,21 +4,38 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization, X-Requested-With"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
           "key": "Cross-Origin-Opener-Policy",
-          "value": "same-origin"
-        },
-        {
-          "key": "Cross-Origin-Embedder-Policy",
-          "value": "credentialless"
+          "value": "same-origin-allow-popups"
         }
       ]
     }

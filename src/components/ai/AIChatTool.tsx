@@ -15,7 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { AIProviderStatusBadge } from './AIProviderStatusBadge';
-import { runAIChat } from '../../services/aiClient';
+import { safeFetchJson } from '../../utils/apiClient';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -70,16 +70,20 @@ export const AIChatTool: React.FC = () => {
     abortControllerRef.current = controller;
 
     try {
-      const data = await runAIChat(
-        newMessages.map((m) => ({ role: m.role, content: m.content })),
-        controller.signal
-      );
+      const data = await safeFetchJson('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+        signal: controller.signal,
+      });
 
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: data.reply || 'No response generated.',
+          content: data.result || 'No response generated.',
           provider: data.provider,
           model: data.model,
         },

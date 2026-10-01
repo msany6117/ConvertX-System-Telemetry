@@ -18,7 +18,7 @@ export class DeepSeekAdapter extends BaseAdapter implements AIProviderAdapter {
   private readonly availableModels = ['deepseek-chat', 'deepseek-reasoner'];
 
   private getApiKey(): string {
-    return process.env.DEEPSEEK_API_KEY || '';
+    return process.env.DEEPSEEK_API_KEY || process.env.VITE_DEEPSEEK_API_KEY || '';
   }
 
   isConfigured(): boolean {
