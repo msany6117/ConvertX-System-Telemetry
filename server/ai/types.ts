@@ -11,7 +11,11 @@ export type AITaskType =
   | 'content'
   | 'code'
   | 'chat'
-  | 'file_process';
+  | 'file_process'
+  | 'seo_optimize'
+  | 'ask_pdf'
+  | 'image_generate'
+  | 'ocr';
 
 export interface AIProviderStats {
   id: AIProviderId;
@@ -71,6 +75,9 @@ export interface AIExecutionOptions {
   keywords?: string[];
   topic?: string;
   summaryStyle?: 'short' | 'medium' | 'detailed' | 'bullet';
+  targetKeyword?: string;
+  documentContext?: string;
+  imageUrl?: string;
 }
 
 export interface ChatMessage {

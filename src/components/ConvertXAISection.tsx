@@ -68,6 +68,36 @@ export const ConvertXAISection: React.FC<ConvertXAISectionProps> = ({
         matchedName = 'AI Code Assistant';
         desc = 'Explain, debug, optimize, and convert code between languages.';
         explanation = 'ConvertX AI initialized the algorithmic code engineer.';
+      } else if (query.includes('image') && (query.includes('generate') || query.includes('art') || query.includes('draw') || query.includes('flux') || query.includes('photo'))) {
+        matchedRoute = '/ai/image-generator';
+        matchedName = 'AI Image Generator';
+        desc = 'Synthesize high-resolution artwork and photos with Flux and SDXL.';
+        explanation = 'ConvertX AI opened the generative visual synthesis studio.';
+      } else if (query.includes('voice') || query.includes('speech') || query.includes('tts') || query.includes('read aloud') || query.includes('listen')) {
+        matchedRoute = '/ai/text-to-speech';
+        matchedName = 'AI Text-to-Speech (TTS)';
+        desc = 'Convert text to natural speech with playback controls and audio downloads.';
+        explanation = 'ConvertX AI loaded the natural voice synthesizer.';
+      } else if (query.includes('seo') || query.includes('keyword') || query.includes('rank') || query.includes('serp')) {
+        matchedRoute = '/ai/seo-optimizer';
+        matchedName = 'AI SEO Content Optimizer';
+        desc = 'Audit articles, calculate keyword density, and preview Google SERP tags.';
+        explanation = 'ConvertX AI activated the algorithmic SEO auditor.';
+      } else if (query.includes('ask pdf') || query.includes('chat pdf') || query.includes('pdf bot')) {
+        matchedRoute = '/ai/ask-pdf';
+        matchedName = 'Ask PDF (Document Chatbot)';
+        desc = 'Upload documents and chat contextually with document citations.';
+        explanation = 'ConvertX AI prepared the contextual document intelligence engine.';
+      } else if (query.includes('ocr') || query.includes('scan') || query.includes('extract text')) {
+        matchedRoute = '/pdf-ocr';
+        matchedName = 'PDF OCR & Text Extractor';
+        desc = 'Optical character recognition for scanned and image-based PDFs.';
+        explanation = 'ConvertX AI loaded Tesseract.js and Gemini Vision OCR scanner.';
+      } else if (query.includes('edit pdf') || query.includes('canvas')) {
+        matchedRoute = '/pdf-editor';
+        matchedName = 'Visual PDF Canvas Editor';
+        desc = 'Add text, erase with whiteouts, insert images, and save modified PDFs.';
+        explanation = 'ConvertX AI launched the interactive visual canvas editor.';
       } else if (query.includes('chat') || query.includes('ask') || query.includes('question') || query.includes('assistant')) {
         matchedRoute = '/ai/chat';
         matchedName = 'Ask ConvertX AI';

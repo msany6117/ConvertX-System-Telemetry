@@ -1,4 +1,4 @@
-import app from '../server/app';
+import app from './app';
 
 // Vercel Serverless Function entry point with bulletproof lifecycle management
 export default function handler(req: any, res: any) {

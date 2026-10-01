@@ -209,18 +209,33 @@ export default function App() {
       );
     }
 
-    if (currentRoute === '/pdf') {
+    if (
+      currentRoute === '/pdf' ||
+      currentRoute.startsWith('/pdf/') ||
+      currentRoute === '/pdf-editor' ||
+      currentRoute === '/pdf-organizer' ||
+      currentRoute === '/pdf-ocr'
+    ) {
+      let initialTab: 'workspace' | 'edit' | 'organize' | 'ocr' | 'merge' | 'split' | 'compress' | 'rotate' = 'workspace';
+      if (currentRoute === '/pdf-ocr' || currentRoute.endsWith('/ocr')) initialTab = 'ocr';
+      else if (currentRoute === '/pdf-organizer' || currentRoute.includes('organize')) initialTab = 'organize';
+      else if (currentRoute === '/pdf-editor' || currentRoute === '/pdf/canvas') initialTab = 'edit';
+      else if (currentRoute.includes('merge')) initialTab = 'merge';
+      else if (currentRoute.includes('split')) initialTab = 'split';
+      else if (currentRoute.includes('compress')) initialTab = 'compress';
+      else if (currentRoute.includes('rotate')) initialTab = 'rotate';
+
       return (
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
-          <div className="text-center max-w-2xl mx-auto space-y-3">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+          <div className="text-center max-w-3xl mx-auto space-y-3">
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
-              PDF Suite & Tools
+              ConvertX Interactive PDF & OCR Suite
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Merge, split, compress, rotate, and convert PDF documents directly inside your browser.
+              Visual Canvas Editor, drag-and-drop page manipulator, Optical Character Recognition (OCR), and document transforms.
             </p>
           </div>
-          <PdfToolsView initialTab="merge" />
+          <PdfToolsView initialTab={initialTab} />
         </div>
       );
     }

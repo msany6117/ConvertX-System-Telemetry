@@ -14,14 +14,21 @@ import {
   CheckCircle2,
   AlertCircle,
   Cpu,
+  PenTool,
+  Scan,
+  Sparkles,
 } from 'lucide-react';
 import { PDFDocument, degrees } from 'pdf-lib';
 import JSZip from 'jszip';
 import { saveHistoryRecord } from '../utils/historyStorage';
+import { UnifiedPdfWorkspace } from './pdf/UnifiedPdfWorkspace';
+import { VisualPdfCanvasEditor } from './pdf/VisualPdfCanvasEditor';
+import { PdfPageManipulator } from './pdf/PdfPageManipulator';
+import { PdfOcrExtractor } from './pdf/PdfOcrExtractor';
 
-type PdfTab = 'merge' | 'split' | 'compress' | 'rotate';
+export type PdfTab = 'workspace' | 'edit' | 'organize' | 'ocr' | 'merge' | 'split' | 'compress' | 'rotate';
 
-export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = 'merge' }) => {
+export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = 'workspace' }) => {
   const [activeTab, setActiveTab] = useState<PdfTab>(initialTab);
 
   // MERGE STATE
@@ -457,9 +464,57 @@ export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = '
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="w-full max-w-6xl mx-auto rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       {/* PDF Sub-Navigation */}
       <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-4 dark:border-slate-800">
+        <button
+          onClick={() => setActiveTab('workspace')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+            activeTab === 'workspace'
+              ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm shadow-violet-500/20 ring-1 ring-violet-400'
+              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Sparkles className="h-4 w-4" />
+          <span>Interactive PDF Studio & AI Suite</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('edit')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+            activeTab === 'edit'
+              ? 'bg-violet-600 text-white shadow-sm shadow-violet-500/20'
+              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+          }`}
+        >
+          <PenTool className="h-4 w-4" />
+          <span>Visual Canvas Editor</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('organize')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+            activeTab === 'organize'
+              ? 'bg-violet-600 text-white shadow-sm shadow-violet-500/20'
+              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Layers className="h-4 w-4" />
+          <span>Page Manipulator & Merge</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ocr')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+            activeTab === 'ocr'
+              ? 'bg-violet-600 text-white shadow-sm shadow-violet-500/20'
+              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Scan className="h-4 w-4" />
+          <span>PDF OCR & Text Extractor</span>
+        </button>
+
         <button
           onClick={() => setActiveTab('merge')}
           className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
@@ -469,7 +524,7 @@ export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = '
           }`}
         >
           <Layers className="h-4 w-4" />
-          <span>Merge PDF</span>
+          <span>Fast Merge</span>
         </button>
 
         <button
@@ -508,6 +563,34 @@ export const PdfToolsView: React.FC<{ initialTab?: PdfTab }> = ({ initialTab = '
           <span>Rotate PDF</span>
         </button>
       </div>
+
+      {/* 0. HERO UNIFIED WORKSPACE: ADOBE ACROBAT STYLE */}
+      {activeTab === 'workspace' && (
+        <div className="mt-6">
+          <UnifiedPdfWorkspace />
+        </div>
+      )}
+
+      {/* 0. NEW SUITE: VISUAL CANVAS EDITOR */}
+      {activeTab === 'edit' && (
+        <div className="mt-6">
+          <VisualPdfCanvasEditor />
+        </div>
+      )}
+
+      {/* 0. NEW SUITE: PAGE MANIPULATOR */}
+      {activeTab === 'organize' && (
+        <div className="mt-6">
+          <PdfPageManipulator />
+        </div>
+      )}
+
+      {/* 0. NEW SUITE: PDF OCR EXTRACTOR */}
+      {activeTab === 'ocr' && (
+        <div className="mt-6">
+          <PdfOcrExtractor />
+        </div>
+      )}
 
       {/* 1. MERGE PDF VIEW */}
       {activeTab === 'merge' && (

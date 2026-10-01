@@ -13,6 +13,10 @@ import {
   Zap,
   Cpu,
   Layers,
+  Image as ImageIcon,
+  Volume2,
+  TrendingUp,
+  Bot,
 } from 'lucide-react';
 import { AITranslatorTool } from './AITranslatorTool';
 import { AIRewriteTool } from './AIRewriteTool';
@@ -22,6 +26,10 @@ import { AITextAnalyzerTool } from './AITextAnalyzerTool';
 import { AIContentGeneratorTool } from './AIContentGeneratorTool';
 import { AICodeAssistantTool } from './AICodeAssistantTool';
 import { AIChatTool } from './AIChatTool';
+import { AIImageGeneratorTool } from './AIImageGeneratorTool';
+import { AITextToSpeechTool } from './AITextToSpeechTool';
+import { AISeoOptimizerTool } from './AISeoOptimizerTool';
+import { AIAskPdfTool } from './AIAskPdfTool';
 import { AIProviderStatusBadge } from './AIProviderStatusBadge';
 
 interface AIToolboxViewProps {
@@ -110,6 +118,46 @@ const AI_TOOLS = [
     color: 'from-amber-500 to-orange-600',
     lightBg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400',
   },
+  {
+    id: 'image-generator',
+    route: '/ai/image-generator',
+    title: 'AI Image Generator',
+    badge: 'Flux & SDXL',
+    description: 'Create high-resolution digital artwork, photorealistic photos, and 3D concept graphics from natural language prompts.',
+    icon: ImageIcon,
+    color: 'from-fuchsia-500 to-pink-600',
+    lightBg: 'bg-fuchsia-50 dark:bg-fuchsia-950/40 text-fuchsia-600 dark:text-fuchsia-400',
+  },
+  {
+    id: 'text-to-speech',
+    route: '/ai/text-to-speech',
+    title: 'AI Text-to-Speech (TTS)',
+    badge: 'Natural Voices',
+    description: 'Synthesize spoken human-like voices with rate/pitch modulation and direct audio export in WAV format.',
+    icon: Volume2,
+    color: 'from-emerald-500 to-green-600',
+    lightBg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400',
+  },
+  {
+    id: 'seo-optimizer',
+    route: '/ai/seo-optimizer',
+    title: 'AI SEO Content Optimizer',
+    badge: 'SERP & Scoring',
+    description: 'Audit articles for search engines, score keyword density, generate Google SERP metadata, and improve rankings.',
+    icon: TrendingUp,
+    color: 'from-cyan-500 to-blue-600',
+    lightBg: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400',
+  },
+  {
+    id: 'ask-pdf',
+    route: '/ai/ask-pdf',
+    title: 'Ask PDF (Document Chat)',
+    badge: 'PDF & DOCX',
+    description: 'Upload PDF and Word documents to chat, ask contextual questions, and extract executive summaries.',
+    icon: Bot,
+    color: 'from-violet-500 to-purple-600',
+    lightBg: 'bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400',
+  },
 ];
 
 export const AIToolboxView: React.FC<AIToolboxViewProps> = ({ activeSubRoute = '/ai', onNavigate }) => {
@@ -133,6 +181,14 @@ export const AIToolboxView: React.FC<AIToolboxViewProps> = ({ activeSubRoute = '
         return <AICodeAssistantTool />;
       case '/ai/chat':
         return <AIChatTool />;
+      case '/ai/image-generator':
+        return <AIImageGeneratorTool />;
+      case '/ai/text-to-speech':
+        return <AITextToSpeechTool />;
+      case '/ai/seo-optimizer':
+        return <AISeoOptimizerTool />;
+      case '/ai/ask-pdf':
+        return <AIAskPdfTool />;
       default:
         return null;
     }

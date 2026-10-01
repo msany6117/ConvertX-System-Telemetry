@@ -1441,6 +1441,79 @@ ${input}
 """`;
       break;
     }
+    case "seo_optimize": {
+      const keyword = options.targetKeyword || "";
+      systemInstruction = `${SYSTEM_GUARD}
+You are a world-class SEO content strategist and algorithmic auditor.
+Analyze the article text for the target keyword "${keyword}".
+Return strict JSON with this exact schema:
+{
+  "seoScore": 82,
+  "readabilityScore": 78,
+  "readabilityLevel": "Grade 8 / Clear",
+  "wordCount": 650,
+  "keywordMetrics": {
+    "keyword": "${keyword}",
+    "occurrences": 7,
+    "densityPercent": 1.2,
+    "status": "Optimal"
+  },
+  "titleSuggestions": [
+    "Catchy SEO Title with Keyword (55-60 chars)"
+  ],
+  "metaDescription": "Compelling 150-160 character meta description with CTA and target keyword.",
+  "recommendedKeywords": ["related keyword 1", "related keyword 2", "long-tail keyword 3"],
+  "checklist": [
+    { "item": "Keyword in Title", "passed": true, "tip": "Title contains target phrase." },
+    { "item": "Optimal Keyword Density (1-2.5%)", "passed": true, "tip": "Currently at 1.2%." },
+    { "item": "Subheadings Structure", "passed": false, "tip": "Add H2 headings containing secondary keywords." }
+  ],
+  "improvedContent": "A fully polished, SEO-optimized version of the input text with natural keyword placement, clear H2/H3 headers, and strong engagement."
+}
+Output only pure valid JSON without markdown fences.`;
+      prompt = `Audit and optimize this content for the keyword "${keyword}":
+
+"""
+${input}
+"""`;
+      break;
+    }
+    case "ask_pdf": {
+      const docContext = options.documentContext || "";
+      systemInstruction = `${SYSTEM_GUARD}
+You are "Ask PDF", an expert document analyst and contextual researcher.
+Your job is to answer the user's question accurately based ON THE PROVIDED DOCUMENT CONTEXT.
+Rules:
+- Be clear, thorough, and cite sections or page quotes when relevant.
+- If the answer cannot be determined from the document context, state that honestly and provide the closest relevant context from the text.
+- Use clear bullet points and bold formatting for key takeaways.`;
+      prompt = `DOCUMENT CONTEXT:
+"""
+${docContext.substring(0, 45e3)}
+"""
+
+USER QUESTION:
+${input}`;
+      break;
+    }
+    case "ocr": {
+      systemInstruction = `${SYSTEM_GUARD}
+You are an elite optical character recognition (OCR) proofreader and digitizer. Convert scanned or noisy OCR text into pristine, accurate, cleanly-formatted text while preserving tables, paragraphs, and lists. Do not invent facts.`;
+      prompt = `Clean up, structure, and accurately digitize this OCR extracted text:
+"""
+${input}
+"""`;
+      break;
+    }
+    case "image_generate": {
+      systemInstruction = `${SYSTEM_GUARD}
+You are a prompt engineering expert for generative image models (Flux, DALL-E 3, Midjourney). Expand user ideas into vivid, photorealistic or artistic prompts with lighting, camera angle, and detail descriptors.`;
+      prompt = `Enhance this image prompt for photorealistic rendering:
+"""
+${input}
+"""`;
+      break;
+    }
     default: {
       prompt = input;
     }
@@ -2686,7 +2759,11 @@ var AIProcessSchema = z.object({
     "content",
     "code",
     "chat",
-    "file_process"
+    "file_process",
+    "seo_optimize",
+    "ask_pdf",
+    "image_generate",
+    "ocr"
   ]),
   input: z.string().min(1, "Input text cannot be empty.").max(1e5, "Input exceeds limit."),
   options: z.record(z.string(), z.any()).optional(),
