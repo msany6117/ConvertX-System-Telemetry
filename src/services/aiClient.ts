@@ -18,7 +18,9 @@ export interface AIProcessRequest {
     | 'grammar'
     | 'analyzer'
     | 'content'
-    | 'code';
+    | 'code'
+    | 'ask_pdf'
+    | 'ocr_image';
   input: string;
   options?: Record<string, any>;
   signal?: AbortSignal;
@@ -187,6 +189,10 @@ export function getClientAIKeys() {
       ['NEXT_PUBLIC_DEEPSEEK_API_KEY', 'VITE_DEEPSEEK_API_KEY', 'DEEPSEEK_API_KEY'],
       ''
     ),
+    openrouterKey: resolve(
+      ['NEXT_PUBLIC_OPENROUTER_API_KEY', 'VITE_OPENROUTER_API_KEY', 'OPENROUTER_API_KEY'],
+      ''
+    ),
   };
 }
 
@@ -286,6 +292,23 @@ Generate high quality content matching the requested template: ${template}. Do n
         systemInstruction: `${baseSystem}
 You are an expert software engineer. Provide code explanation, bug fixing, optimization, or translation with syntax highlighted markdown code blocks.`,
         prompt: `Action: ${action}\nLanguage: ${language}\n\nCode/Request:\n${input}`,
+      };
+    }
+
+    case 'ask_pdf': {
+      const doc = options.documentContext || '';
+      return {
+        systemInstruction: `${baseSystem}
+You are an intelligent PDF document assistant. Analyze the document context provided below and accurately answer the user's questions. Be clear, concise, and helpful.`,
+        prompt: `DOCUMENT CONTEXT:\n${doc}\n\nUSER QUESTION:\n${input}`,
+      };
+    }
+
+    case 'ocr_image': {
+      return {
+        systemInstruction: `${baseSystem}
+You are an Optical Character Recognition (OCR) model. Transcribe all text from the provided image accurately.`,
+        prompt: input,
       };
     }
 
@@ -411,6 +434,46 @@ async function callClientDeepSeek(
 }
 
 /**
+ * Direct Client Call: OpenRouter
+ */
+async function callClientOpenRouter(
+  prompt: string,
+  systemInstruction: string,
+  model = 'deepseek/deepseek-chat',
+  signal?: AbortSignal
+): Promise<string> {
+  const { openrouterKey } = getClientAIKeys();
+  if (!openrouterKey) throw new Error('OpenRouter API key is not configured.');
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${openrouterKey}`,
+      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://convertx.app',
+      'X-Title': 'ConvertX PDF Studio',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: prompt },
+      ],
+    }),
+    signal,
+  });
+
+  const parsed = await safeParseJsonResponse<any>(res);
+  if (!parsed.ok || !parsed.data) {
+    throw new Error(parsed.error || `OpenRouter request failed with status ${res.status}`);
+  }
+
+  const content = parsed.data.choices?.[0]?.message?.content;
+  if (!content) throw new Error('OpenRouter returned empty response');
+  return content;
+}
+
+/**
  * Execute client-side fallback across available providers
  */
 async function executeClientFallback(
@@ -467,6 +530,22 @@ async function executeClientFallback(
   } catch (dsErr: any) {
     if (signal?.aborted) throw dsErr;
     errors.push(`DeepSeek: ${dsErr.message}`);
+  }
+
+  // 4. Try OpenRouter
+  try {
+    const rawResult = await callClientOpenRouter(prompt, systemInstruction, 'deepseek/deepseek-chat', signal);
+    const result = task === 'translate' ? cleanTranslatedText(rawResult) : rawResult;
+    return {
+      result,
+      provider: 'openrouter',
+      model: 'openrouter/deepseek-chat (Client Direct)',
+      isClientFallback: true,
+      switchedEngine: true,
+    };
+  } catch (orErr: any) {
+    if (signal?.aborted) throw orErr;
+    errors.push(`OpenRouter: ${orErr.message}`);
   }
 
   throw new Error(`All client AI providers failed: ${errors.join(' | ')}`);
@@ -550,37 +629,114 @@ export async function runAIChat(
     if (signal?.aborted) throw err;
   }
 
-  // Client-Side Chat Fallback via Groq
-  const { groqKey } = getClientAIKeys();
-  if (!groqKey) {
-    throw new Error('Chat service is temporarily unavailable.');
+  // Client-Side Chat Fallback across providers: Groq -> Gemini -> DeepSeek -> OpenRouter
+  const { groqKey, geminiKey, deepseekKey, openrouterKey } = getClientAIKeys();
+
+  // 1. Try Groq
+  if (groqKey) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${groqKey}`,
+        },
+        body: JSON.stringify({
+          model: 'openai/gpt-oss-120b',
+          messages,
+          temperature: 0.5,
+        }),
+        signal,
+      });
+      const parsed = await safeParseJsonResponse<any>(res);
+      if (parsed.ok && parsed.data?.choices?.[0]?.message?.content) {
+        return {
+          reply: parsed.data.choices[0].message.content,
+          provider: 'groq',
+          model: 'openai/gpt-oss-120b (Client Direct)',
+          isClientFallback: true,
+        };
+      }
+    } catch {}
   }
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${groqKey}`,
-    },
-    body: JSON.stringify({
-      model: 'openai/gpt-oss-120b',
-      messages,
-      temperature: 0.5,
-    }),
-    signal,
-  });
-
-  const parsed = await safeParseJsonResponse<any>(res);
-  if (!parsed.ok || !parsed.data) {
-    throw new Error(parsed.error || 'Failed to complete chat response');
+  // 2. Try Gemini
+  if (geminiKey) {
+    try {
+      const lastUser = messages.filter((m) => m.role === 'user').pop()?.content || '';
+      const prompt = messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
+      const text = await callClientGemini(prompt, 'You are ConvertX AI assistant.', 'gemini-3.8-flash', signal);
+      if (text) {
+        return {
+          reply: text,
+          provider: 'gemini',
+          model: 'gemini-3.8-flash (Client Direct)',
+          isClientFallback: true,
+          switchedEngine: true,
+        };
+      }
+    } catch {}
   }
 
-  return {
-    reply: parsed.data.choices?.[0]?.message?.content || '',
-    provider: 'groq',
-    model: 'openai/gpt-oss-120b (Client Direct)',
-    isClientFallback: true,
-  };
+  // 3. Try DeepSeek
+  if (deepseekKey) {
+    try {
+      const res = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${deepseekKey}`,
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages,
+        }),
+        signal,
+      });
+      const parsed = await safeParseJsonResponse<any>(res);
+      if (parsed.ok && parsed.data?.choices?.[0]?.message?.content) {
+        return {
+          reply: parsed.data.choices[0].message.content,
+          provider: 'deepseek',
+          model: 'deepseek-chat (Client Direct)',
+          isClientFallback: true,
+          switchedEngine: true,
+        };
+      }
+    } catch {}
+  }
+
+  // 4. Try OpenRouter
+  if (openrouterKey) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openrouterKey}`,
+          'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://convertx.app',
+          'X-Title': 'ConvertX PDF Studio',
+        },
+        body: JSON.stringify({
+          model: 'deepseek/deepseek-chat',
+          messages,
+        }),
+        signal,
+      });
+      const parsed = await safeParseJsonResponse<any>(res);
+      if (parsed.ok && parsed.data?.choices?.[0]?.message?.content) {
+        return {
+          reply: parsed.data.choices[0].message.content,
+          provider: 'openrouter',
+          model: 'openrouter/deepseek-chat (Client Direct)',
+          isClientFallback: true,
+          switchedEngine: true,
+        };
+      }
+    } catch {}
+  }
+
+  throw new Error('AI Chat service is temporarily unavailable. Please configure an API key.');
 }
 
 /**
