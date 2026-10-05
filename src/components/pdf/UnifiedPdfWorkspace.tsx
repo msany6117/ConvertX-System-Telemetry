@@ -44,6 +44,7 @@ import {
   Circle,
   Minus,
   ArrowRight,
+  ArrowLeftRight,
   Stamp,
   Palette,
   Search,
@@ -71,6 +72,17 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
+  Paintbrush,
+  Pencil,
+  Triangle,
+  Star,
+  SlidersHorizontal,
+  ShieldCheck,
+  CheckSquare,
+  Zap,
+  Keyboard,
+  FileCode,
+  Command,
 } from 'lucide-react';
 import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
 import JSZip from 'jszip';
@@ -100,15 +112,27 @@ export interface TextBlock {
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
   opacity?: number;
+  rotation?: number;
   isOriginalParsed?: boolean;
   isDeleted?: boolean;
   isOcr?: boolean;
 }
 
+export type LineShapeType =
+  | 'line'
+  | 'dashed-line'
+  | 'dotted-line'
+  | 'arrow'
+  | 'double-arrow'
+  | 'rectangle'
+  | 'circle'
+  | 'triangle'
+  | 'highlight';
+
 export interface ShapeBlock {
   id: string;
   type: 'shape';
-  shapeType: 'rectangle' | 'circle' | 'line' | 'arrow' | 'highlight';
+  shapeType: LineShapeType;
   pageIndex: number;
   x: number;
   y: number;
@@ -118,12 +142,27 @@ export interface ShapeBlock {
   strokeColor: string;
   strokeWidth: number;
   opacity: number;
+  rotation?: number;
+  lineStyle?: 'solid' | 'dashed' | 'dotted';
+  arrowType?: 'none' | 'single' | 'double';
+  showDimensions?: boolean;
 }
+
+export type StampPresetType =
+  | 'APPROVED'
+  | 'CONFIDENTIAL'
+  | 'PAID'
+  | 'DRAFT'
+  | 'OFFICIAL'
+  | 'REJECTED'
+  | 'VERIFIED'
+  | 'FINAL'
+  | 'CUSTOM';
 
 export interface StampBlock {
   id: string;
   type: 'stamp';
-  stampType: 'APPROVED' | 'CONFIDENTIAL' | 'PAID' | 'DRAFT' | 'OFFICIAL' | 'REJECTED' | 'CUSTOM';
+  stampType: StampPresetType;
   customText?: string;
   pageIndex: number;
   x: number;
@@ -132,6 +171,10 @@ export interface StampBlock {
   height: number;
   color: string;
   rotation?: number;
+  imageUrl?: string;
+  borderStyle?: 'double' | 'solid' | 'dashed' | 'seal';
+  showDate?: boolean;
+  dateText?: string;
 }
 
 export interface ImageBlock {
@@ -144,7 +187,10 @@ export interface ImageBlock {
   height: number;
   dataUrl: string;
   opacity?: number;
+  rotation?: number;
 }
+
+export type BrushType = 'pencil' | 'pen' | 'calligraphy' | 'brush' | 'highlighter';
 
 export interface DrawStroke {
   id: string;
@@ -153,7 +199,12 @@ export interface DrawStroke {
   points: Array<{ x: number; y: number }>;
   color: string;
   strokeWidth: number;
+  brushType?: BrushType;
+  opacity?: number;
+  isHighlighter?: boolean;
 }
+
+export type HandleType = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
 export interface LinkBlock {
   id: string;
@@ -270,7 +321,7 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
 
   // Active Tool Selection in ConvertX PDF Studio
   const [activeTool, setActiveTool] = useState<
-    'select' | 'addText' | 'editText' | 'sign' | 'draw' | 'line' | 'highlight' | 'image' | 'stamp' | 'link' | 'note' | 'whiteout'
+    'select' | 'addText' | 'editText' | 'sign' | 'draw' | 'eraser' | 'line' | 'highlight' | 'image' | 'stamp' | 'link' | 'note' | 'whiteout'
   >('editText');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
@@ -284,21 +335,72 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
   const [fontFamily, setFontFamily] = useState<string>('Arial, sans-serif');
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
 
-  // Shapes & Lines state
-  const [lineShapeType, setLineShapeType] = useState<'line' | 'arrow' | 'rectangle' | 'circle'>('line');
-  const [strokeColor, setStrokeColor] = useState<string>('#2563eb');
-  const [strokeWidth, setStrokeWidth] = useState<number>(2);
-
-  // Stamps state
-  const [stampPreset, setStampPreset] = useState<'APPROVED' | 'CONFIDENTIAL' | 'PAID' | 'DRAFT' | 'OFFICIAL' | 'REJECTED' | 'CUSTOM'>('APPROVED');
-  const [customStampText, setCustomStampText] = useState<string>('APPROVED');
-  const [stampColor, setStampColor] = useState<string>('#059669');
-
-  // Freehand Drawing state
+  // 1. ADVANCED DRAW & MULTI-BRUSH SUITE
+  const [brushType, setBrushType] = useState<BrushType>('pen');
   const [penColor, setPenColor] = useState<string>('#000000');
-  const [penWidth, setPenWidth] = useState<number>(2);
+  const [penWidth, setPenWidth] = useState<number>(3);
+  const [penOpacity, setPenOpacity] = useState<number>(1.0);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [currentStroke, setCurrentStroke] = useState<Array<{ x: number; y: number }>>([]);
+
+  // 1b. ERASER SUITE (Precision & Object modes)
+  const [eraserMode, setEraserMode] = useState<'precision' | 'object'>('precision');
+  const [eraserRadius, setEraserRadius] = useState<number>(20);
+  const [isPrecisionErasing, setIsPrecisionErasing] = useState<boolean>(false);
+  const [eraserCursorPos, setEraserCursorPos] = useState<{ x: number; y: number } | null>(null);
+
+  // 2. ENHANCED LINE & SHAPES SUITE
+  const [lineShapeType, setLineShapeType] = useState<LineShapeType>('line');
+  const [strokeColor, setStrokeColor] = useState<string>('#2563eb');
+  const [shapeFillColor, setShapeFillColor] = useState<string>('transparent');
+  const [strokeWidth, setStrokeWidth] = useState<number>(2);
+  const [shapeOpacity, setShapeOpacity] = useState<number>(1.0);
+  const [showDimensions, setShowDimensions] = useState<boolean>(true);
+
+  // 3. FREEHAND TEXT HIGHLIGHTER SUITE
+  const [highlighterMode, setHighlighterMode] = useState<'freehand' | 'box'>('freehand');
+  const [highlighterColor, setHighlighterColor] = useState<string>('#fef08a');
+  const [highlighterOpacity, setHighlighterOpacity] = useState<number>(0.45);
+  const [highlighterWidth, setHighlighterWidth] = useState<number>(24);
+
+  // 4. ADVANCED STAMP & CUSTOM IMAGE STAMPS
+  const [stampPreset, setStampPreset] = useState<StampPresetType>('APPROVED');
+  const [customStampText, setCustomStampText] = useState<string>('APPROVED');
+  const [stampColor, setStampColor] = useState<string>('#059669');
+  const [stampBorderStyle, setStampBorderStyle] = useState<'double' | 'solid' | 'dashed' | 'seal'>('double');
+  const [stampShowDate, setStampShowDate] = useState<boolean>(true);
+  const [stampDateText, setStampDateText] = useState<string>(
+    new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
+  );
+  const [stampRotation, setStampRotation] = useState<number>(-6);
+  const stampFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 5. UNIVERSAL 8-POINT ELEMENT RESIZING & TRANSFORM STATE
+  const [resizeState, setResizeState] = useState<{
+    isResizing: boolean;
+    handle: HandleType;
+    elementId: string;
+    elementType: 'text' | 'shape' | 'image' | 'stamp' | 'note' | 'whiteout';
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    initialW: number;
+    initialH: number;
+    containerWidth: number;
+    containerHeight: number;
+    aspectRatio: number;
+  } | null>(null);
+
+  const [rotateDragState, setRotateDragState] = useState<{
+    isRotating: boolean;
+    elementId: string;
+    elementType: 'text' | 'shape' | 'image' | 'stamp';
+    centerX: number;
+    centerY: number;
+    initialRotation: number;
+    startAngle: number;
+  } | null>(null);
 
   // Annotations Stores
   const [textBlocks, setTextBlocks] = useState<TextBlock[]>([]);
@@ -326,6 +428,22 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
   const [isManagePagesOpen, setIsManagePagesOpen] = useState<boolean>(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState<boolean>(false);
   const [linkUrlInput, setLinkUrlInput] = useState<string>('https://');
+
+  // Comprehensive Export / Save Modal & Format state
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [exportFormat, setExportFormat] = useState<'vector-pdf' | 'web-pdf' | 'image' | 'text'>('vector-pdf');
+  const [imageExportType, setImageExportType] = useState<'png' | 'jpeg'>('png');
+  const [imageExportQuality, setImageExportQuality] = useState<number>(0.92);
+  const [textExportFormat, setTextExportFormat] = useState<'txt' | 'json'>('txt');
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState<boolean>(false);
+
+  // Clipboard state for Ctrl+C / Ctrl+V
+  const [clipboardElement, setClipboardElement] = useState<{
+    type: 'text' | 'shape' | 'stamp' | 'image' | 'whiteout' | 'link' | 'note';
+    data: any;
+  } | null>(null);
+
+
 
   // Unified PDF Studio Action Modals
   const [isMergeModalOpen, setIsMergeModalOpen] = useState<boolean>(false);
@@ -1253,7 +1371,15 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
   // 4. CANVAS CLICKS (Add Text, Line, Shape, Stamp, Link, Note)
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!canvasRef.current) return;
-    if (activeTool === 'select' || activeTool === 'draw' || isHandTool) return;
+    if (
+      activeTool === 'select' ||
+      activeTool === 'draw' ||
+      activeTool === 'eraser' ||
+      (activeTool === 'highlight' && highlighterMode === 'freehand') ||
+      isHandTool
+    ) {
+      return;
+    }
 
     const rect = canvasRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -1285,6 +1411,12 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
       pushHistorySnapshot(updated);
       setActiveTool('editText');
     } else if (activeTool === 'line') {
+      const isLineType =
+        lineShapeType === 'line' ||
+        lineShapeType === 'dashed-line' ||
+        lineShapeType === 'dotted-line' ||
+        lineShapeType === 'arrow' ||
+        lineShapeType === 'double-arrow';
       const newShape: ShapeBlock = {
         id: `shape_${Date.now()}`,
         type: 'shape',
@@ -1292,11 +1424,13 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
         pageIndex: currentPage - 1,
         x: relX,
         y: relY,
-        width: lineShapeType === 'line' || lineShapeType === 'arrow' ? 0.25 : 0.2,
-        height: lineShapeType === 'line' || lineShapeType === 'arrow' ? 0.015 : 0.1,
+        width: isLineType ? 0.25 : 0.2,
+        height: isLineType ? 0.02 : 0.12,
         strokeColor,
+        fillColor: shapeFillColor,
         strokeWidth,
-        opacity: 1.0,
+        opacity: shapeOpacity,
+        showDimensions,
       };
       const updated = [...shapeBlocks, newShape];
       setShapeBlocks(updated);
@@ -1311,12 +1445,12 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
         pageIndex: currentPage - 1,
         x: relX,
         y: relY,
-        width: 0.25,
-        height: 0.035,
-        strokeColor: '#fef08a',
-        fillColor: '#fef08a',
+        width: 0.26,
+        height: 0.038,
+        strokeColor: highlighterColor,
+        fillColor: highlighterColor,
         strokeWidth: 0,
-        opacity: 0.5,
+        opacity: highlighterOpacity,
       };
       const updated = [...shapeBlocks, newHighlight];
       setShapeBlocks(updated);
@@ -1328,14 +1462,17 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
         id: `stamp_${Date.now()}`,
         type: 'stamp',
         stampType: stampPreset,
-        customText: stampPreset === 'CUSTOM' ? customStampText : undefined,
+        customText: stampPreset === 'CUSTOM' ? customStampText : stampPreset,
+        borderStyle: stampBorderStyle,
+        showDate: stampShowDate,
+        dateText: stampDateText,
         pageIndex: currentPage - 1,
         x: relX,
         y: relY,
         width: 0.22,
-        height: 0.08,
+        height: stampShowDate ? 0.1 : 0.085,
         color: stampColor,
-        rotation: -6,
+        rotation: stampRotation,
       };
       const updated = [...stampBlocks, newStamp];
       setStampBlocks(updated);
@@ -1392,47 +1529,224 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
     }
   };
 
-  // 5. FREEHAND DRAWING
-  const handleMouseDownDraw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool !== 'draw' || !drawCanvasRef.current) return;
-    setIsDrawing(true);
-    const rect = drawCanvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setCurrentStroke([{ x, y }]);
+  // Distance helper from point (px, py) to line segment (x1, y1)-(x2, y2)
+  const distToSegment = (px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return Math.hypot(px - x1, py - y1);
+    let t = ((px - x1) * dx + (py - y1) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
   };
 
-  const handleMouseMoveDraw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || activeTool !== 'draw' || !drawCanvasRef.current) return;
-    const rect = drawCanvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setCurrentStroke((prev) => [...prev, { x, y }]);
+  // 5. PRECISION ERASER COLLISION HANDLER
+  const handlePrecisionEraseAt = (clientX: number, clientY: number) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    const W = rect.width;
+    const H = rect.height;
 
-    const ctx = drawCanvasRef.current.getContext('2d');
-    if (ctx && currentStroke.length > 1) {
-      ctx.strokeStyle = penColor;
-      ctx.lineWidth = penWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(currentStroke[currentStroke.length - 2].x, currentStroke[currentStroke.length - 2].y);
-      ctx.lineTo(x, y);
-      ctx.stroke();
+    setEraserCursorPos({ x: px, y: py });
+
+    // 1. Collision check with drawStrokes on this page
+    let strokesChanged = false;
+    const remainingStrokes = drawStrokes.filter((st) => {
+      if (st.pageIndex !== currentPage - 1) return true;
+      for (let i = 0; i < st.points.length; i++) {
+        const ptX = st.points[i].x * W;
+        const ptY = st.points[i].y * H;
+        if (Math.hypot(px - ptX, py - ptY) <= eraserRadius) {
+          strokesChanged = true;
+          return false;
+        }
+        if (i > 0) {
+          const prevX = st.points[i - 1].x * W;
+          const prevY = st.points[i - 1].y * H;
+          if (distToSegment(px, py, prevX, prevY, ptX, ptY) <= eraserRadius) {
+            strokesChanged = true;
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+
+    if (strokesChanged) {
+      setDrawStrokes(remainingStrokes);
+    }
+
+    // 2. Collision check with shapeBlocks on this page
+    let shapesChanged = false;
+    const remainingShapes = shapeBlocks.filter((sh) => {
+      if (sh.pageIndex !== currentPage - 1) return true;
+      const shX = sh.x * W;
+      const shY = sh.y * H;
+      const shW = sh.width * W;
+      const shH = sh.height * H;
+      if (
+        px >= shX - eraserRadius &&
+        px <= shX + shW + eraserRadius &&
+        py >= shY - eraserRadius &&
+        py <= shY + shH + eraserRadius
+      ) {
+        shapesChanged = true;
+        return false;
+      }
+      return true;
+    });
+
+    if (shapesChanged) {
+      setShapeBlocks(remainingShapes);
+    }
+
+    // 3. Collision check with whiteouts on this page
+    let whiteoutsChanged = false;
+    const remainingWhiteouts = whiteouts.filter((wh) => {
+      if (wh.pageIndex !== currentPage - 1) return true;
+      const whX = wh.x * W;
+      const whY = wh.y * H;
+      const whW = wh.width * W;
+      const whH = wh.height * H;
+      if (
+        px >= whX - eraserRadius &&
+        px <= whX + whW + eraserRadius &&
+        py >= whY - eraserRadius &&
+        py <= whY + whH + eraserRadius
+      ) {
+        whiteoutsChanged = true;
+        return false;
+      }
+      return true;
+    });
+
+    if (whiteoutsChanged) {
+      setWhiteouts(remainingWhiteouts);
     }
   };
 
+  // 5b. OBJECT ERASER HANDLER (1-Click deletion)
+  const handleObjectErase = (
+    id: string,
+    type: 'stroke' | 'shape' | 'text' | 'image' | 'stamp' | 'note' | 'whiteout'
+  ) => {
+    if (type === 'stroke') {
+      setDrawStrokes((prev) => prev.filter((s) => s.id !== id));
+    } else if (type === 'shape') {
+      setShapeBlocks((prev) => prev.filter((s) => s.id !== id));
+    } else if (type === 'text') {
+      setTextBlocks((prev) => prev.filter((t) => t.id !== id));
+    } else if (type === 'image') {
+      setImageBlocks((prev) => prev.filter((i) => i.id !== id));
+    } else if (type === 'stamp') {
+      setStampBlocks((prev) => prev.filter((s) => s.id !== id));
+    } else if (type === 'note') {
+      setNoteBlocks((prev) => prev.filter((n) => n.id !== id));
+    } else if (type === 'whiteout') {
+      setWhiteouts((prev) => prev.filter((w) => w.id !== id));
+    }
+    if (selectedElementId === id) setSelectedElementId(null);
+    pushHistorySnapshot();
+  };
+
+  // Clear all freehand strokes on the current page
+  const handleClearPageDrawings = () => {
+    setDrawStrokes((prev) => prev.filter((s) => s.pageIndex !== currentPage - 1));
+    pushHistorySnapshot();
+    setExportMessage('Cleared all drawing strokes on this page.');
+    setTimeout(() => setExportMessage(null), 2500);
+  };
+
+  // Delete an individual freehand stroke (Used in Object Eraser mode)
+  const deleteStroke = (strokeId: string) => {
+    const updated = drawStrokes.filter((s) => s.id !== strokeId);
+    setDrawStrokes(updated);
+    pushHistorySnapshot(undefined, undefined, undefined, undefined, updated);
+  };
+
+  // 5c. FREEHAND DRAWING & HIGHLIGHTING HANDLERS
+  const handleMouseDownDraw = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isHandTool) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const relX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const relY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+    if (activeTool === 'eraser') {
+      if (eraserMode === 'precision') {
+        setIsPrecisionErasing(true);
+        handlePrecisionEraseAt(e.clientX, e.clientY);
+      }
+      return;
+    }
+
+    const canDraw = activeTool === 'draw' || (activeTool === 'highlight' && highlighterMode === 'freehand');
+    if (!canDraw) return;
+
+    setIsDrawing(true);
+    setCurrentStroke([{ x: relX, y: relY }]);
+  };
+
+  const handleMouseMoveDraw = (e: React.MouseEvent<HTMLDivElement>) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+
+    if (activeTool === 'eraser') {
+      setEraserCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      if (isPrecisionErasing && eraserMode === 'precision') {
+        handlePrecisionEraseAt(e.clientX, e.clientY);
+      }
+      return;
+    }
+
+    if (!isDrawing) return;
+    let relX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    let relY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+    // Photoshop-Style Shift-Key Straight Highlighter & Drawing Constraint
+    if (e.shiftKey && currentStroke.length > 0) {
+      const startPt = currentStroke[0];
+      const deltaX = Math.abs(relX - startPt.x) * rect.width;
+      const deltaY = Math.abs(relY - startPt.y) * rect.height;
+      if (deltaX >= deltaY) {
+        relY = startPt.y; // Lock strictly horizontal (0°) for clean line-by-line highlighting
+      } else {
+        relX = startPt.x; // Lock strictly vertical (90°) for margins / columns
+      }
+      setCurrentStroke([startPt, { x: relX, y: relY }]);
+      return;
+    }
+
+    setCurrentStroke((prev) => [...prev, { x: relX, y: relY }]);
+  };
+
   const handleMouseUpDraw = () => {
-    if (!isDrawing || activeTool !== 'draw') return;
+    if (isPrecisionErasing) {
+      setIsPrecisionErasing(false);
+      pushHistorySnapshot();
+      return;
+    }
+
+    if (!isDrawing) return;
     setIsDrawing(false);
-    if (currentStroke.length > 1) {
+
+    if (currentStroke.length > 0) {
+      const isHl = activeTool === 'highlight' && highlighterMode === 'freehand';
       const stroke: DrawStroke = {
         id: `draw_${Date.now()}`,
         type: 'draw',
         pageIndex: currentPage - 1,
         points: currentStroke,
-        color: penColor,
-        strokeWidth: penWidth,
+        color: isHl ? highlighterColor : penColor,
+        strokeWidth: isHl ? highlighterWidth : penWidth,
+        opacity: isHl ? highlighterOpacity : penOpacity,
+        brushType: isHl ? 'highlighter' : brushType,
+        isHighlighter: isHl,
       };
       const updated = [...drawStrokes, stroke];
       setDrawStrokes(updated);
@@ -1441,7 +1755,7 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
     setCurrentStroke([]);
   };
 
-  // 5b. REAL-TIME ELEMENT DRAGGING & POSITION UPDATING
+  // 5d. REAL-TIME ELEMENT DRAGGING & POSITION UPDATING
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
     elementId: string;
@@ -1463,7 +1777,14 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
     initialY: number
   ) => {
     if (e.button !== 0) return; // Only left mouse button
-    if (isHandTool || activeTool === 'draw') return;
+    if (
+      isHandTool ||
+      activeTool === 'draw' ||
+      activeTool === 'eraser' ||
+      (activeTool === 'highlight' && highlighterMode === 'freehand')
+    ) {
+      return;
+    }
     e.stopPropagation();
 
     setSelectedElementId(id);
@@ -1558,6 +1879,295 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
     };
   }, [dragState, pushHistorySnapshot]);
 
+  // 5e. UNIVERSAL 8-POINT RESIZE HANDLER
+  const startResizing = (
+    e: React.MouseEvent,
+    handle: HandleType,
+    elementId: string,
+    elementType: 'text' | 'shape' | 'image' | 'stamp' | 'note' | 'whiteout',
+    initialX: number,
+    initialY: number,
+    initialW: number,
+    initialH: number
+  ) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const container = containerRef.current;
+    const rect = container?.getBoundingClientRect();
+    const containerWidth = rect?.width || pageDimensions.width || 800;
+    const containerHeight = rect?.height || pageDimensions.height || 1000;
+
+    setSelectedElementId(elementId);
+
+    setResizeState({
+      isResizing: true,
+      handle,
+      elementId,
+      elementType,
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX,
+      initialY,
+      initialW,
+      initialH,
+      containerWidth,
+      containerHeight,
+      aspectRatio: initialW / (initialH || 0.01),
+    });
+  };
+
+  useEffect(() => {
+    if (!resizeState || !resizeState.isResizing) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const deltaX = (e.clientX - resizeState.startX) / resizeState.containerWidth;
+      const deltaY = (e.clientY - resizeState.startY) / resizeState.containerHeight;
+
+      let newX = resizeState.initialX;
+      let newY = resizeState.initialY;
+      let newW = resizeState.initialW;
+      let newH = resizeState.initialH;
+
+      const isCorner = ['nw', 'ne', 'se', 'sw'].includes(resizeState.handle);
+      const lockAspect =
+        e.shiftKey ||
+        (isCorner && (resizeState.elementType === 'image' || resizeState.elementType === 'stamp'));
+
+      switch (resizeState.handle) {
+        case 'e':
+          newW = Math.max(0.02, Math.min(1 - newX, resizeState.initialW + deltaX));
+          break;
+        case 'w':
+          newW = Math.max(0.02, resizeState.initialW - deltaX);
+          newX = Math.max(0, resizeState.initialX + (resizeState.initialW - newW));
+          break;
+        case 's':
+          newH = Math.max(0.015, Math.min(1 - newY, resizeState.initialH + deltaY));
+          break;
+        case 'n':
+          newH = Math.max(0.015, resizeState.initialH - deltaY);
+          newY = Math.max(0, resizeState.initialY + (resizeState.initialH - newH));
+          break;
+        case 'se':
+          newW = Math.max(0.02, Math.min(1 - newX, resizeState.initialW + deltaX));
+          if (lockAspect) {
+            newH = Math.max(0.015, Math.min(1 - newY, newW / resizeState.aspectRatio));
+          } else {
+            newH = Math.max(0.015, Math.min(1 - newY, resizeState.initialH + deltaY));
+          }
+          break;
+        case 'sw':
+          newW = Math.max(0.02, resizeState.initialW - deltaX);
+          newX = Math.max(0, resizeState.initialX + (resizeState.initialW - newW));
+          if (lockAspect) {
+            newH = Math.max(0.015, Math.min(1 - newY, newW / resizeState.aspectRatio));
+          } else {
+            newH = Math.max(0.015, Math.min(1 - newY, resizeState.initialH + deltaY));
+          }
+          break;
+        case 'ne':
+          newW = Math.max(0.02, Math.min(1 - newX, resizeState.initialW + deltaX));
+          if (lockAspect) {
+            newH = Math.max(0.015, newW / resizeState.aspectRatio);
+            newY = Math.max(0, resizeState.initialY + (resizeState.initialH - newH));
+          } else {
+            newH = Math.max(0.015, resizeState.initialH - deltaY);
+            newY = Math.max(0, resizeState.initialY + (resizeState.initialH - newH));
+          }
+          break;
+        case 'nw':
+          newW = Math.max(0.02, resizeState.initialW - deltaX);
+          newX = Math.max(0, resizeState.initialX + (resizeState.initialW - newW));
+          if (lockAspect) {
+            newH = Math.max(0.015, newW / resizeState.aspectRatio);
+            newY = Math.max(0, resizeState.initialY + (resizeState.initialH - newH));
+          } else {
+            newH = Math.max(0.015, resizeState.initialH - deltaY);
+            newY = Math.max(0, resizeState.initialY + (resizeState.initialH - newH));
+          }
+          break;
+      }
+
+      if (resizeState.elementType === 'text') {
+        setTextBlocks((prev) =>
+          prev.map((tb) =>
+            tb.id === resizeState.elementId ? { ...tb, x: newX, y: newY, width: newW, height: newH } : tb
+          )
+        );
+      } else if (resizeState.elementType === 'shape') {
+        setShapeBlocks((prev) =>
+          prev.map((sh) =>
+            sh.id === resizeState.elementId ? { ...sh, x: newX, y: newY, width: newW, height: newH } : sh
+          )
+        );
+      } else if (resizeState.elementType === 'image') {
+        setImageBlocks((prev) =>
+          prev.map((im) =>
+            im.id === resizeState.elementId ? { ...im, x: newX, y: newY, width: newW, height: newH } : im
+          )
+        );
+      } else if (resizeState.elementType === 'stamp') {
+        setStampBlocks((prev) =>
+          prev.map((st) =>
+            st.id === resizeState.elementId ? { ...st, x: newX, y: newY, width: newW, height: newH } : st
+          )
+        );
+      } else if (resizeState.elementType === 'whiteout') {
+        setWhiteouts((prev) =>
+          prev.map((wh) =>
+            wh.id === resizeState.elementId ? { ...wh, x: newX, y: newY, width: newW, height: newH } : wh
+          )
+        );
+      } else if (resizeState.elementType === 'note') {
+        setNoteBlocks((prev) =>
+          prev.map((nt) =>
+            nt.id === resizeState.elementId ? { ...nt, x: newX, y: newY } : nt
+          )
+        );
+      }
+    };
+
+    const handleWindowMouseUp = () => {
+      pushHistorySnapshot();
+      setResizeState(null);
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [resizeState, pushHistorySnapshot]);
+
+  // 5f. UNIVERSAL INTERACTIVE 360-DEGREE ROTATION HANDLER
+  const startRotating = (
+    e: React.MouseEvent,
+    elementId: string,
+    elementType: 'text' | 'shape' | 'image' | 'stamp',
+    elemX: number,
+    elemY: number,
+    elemW: number,
+    elemH: number,
+    currentRotation: number = 0
+  ) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.left + (elemX + elemW / 2) * rect.width;
+    const centerY = rect.top + (elemY + elemH / 2) * rect.height;
+
+    const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+
+    setSelectedElementId(elementId);
+    setRotateDragState({
+      isRotating: true,
+      elementId,
+      elementType,
+      centerX,
+      centerY,
+      initialRotation: currentRotation,
+      startAngle,
+    });
+  };
+
+  useEffect(() => {
+    if (!rotateDragState || !rotateDragState.isRotating) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const currentAngle =
+        Math.atan2(e.clientY - rotateDragState.centerY, e.clientX - rotateDragState.centerX) *
+        (180 / Math.PI);
+      const angleDiff = currentAngle - rotateDragState.startAngle;
+      let newRot = Math.round(rotateDragState.initialRotation + angleDiff);
+
+      // Shift key snaps to 15-degree increments (Figma / Photoshop style)
+      if (e.shiftKey) {
+        newRot = Math.round(newRot / 15) * 15;
+      } else {
+        // Snap to 0, 90, 180, 270 if close
+        const mod90 = Math.abs(newRot % 90);
+        if (mod90 < 4) {
+          newRot = Math.round(newRot / 90) * 90;
+        }
+      }
+
+      // Normalize between -180 and 180 degrees
+      newRot = ((newRot % 360) + 360) % 360;
+      if (newRot > 180) newRot -= 360;
+
+      if (rotateDragState.elementType === 'stamp') {
+        setStampBlocks((prev) =>
+          prev.map((st) => (st.id === rotateDragState.elementId ? { ...st, rotation: newRot } : st))
+        );
+      } else if (rotateDragState.elementType === 'shape') {
+        setShapeBlocks((prev) =>
+          prev.map((sh) => (sh.id === rotateDragState.elementId ? { ...sh, rotation: newRot } : sh))
+        );
+      } else if (rotateDragState.elementType === 'image') {
+        setImageBlocks((prev) =>
+          prev.map((im) => (im.id === rotateDragState.elementId ? { ...im, rotation: newRot } : im))
+        );
+      } else if (rotateDragState.elementType === 'text') {
+        setTextBlocks((prev) =>
+          prev.map((tb) => (tb.id === rotateDragState.elementId ? { ...tb, rotation: newRot } : tb))
+        );
+      }
+    };
+
+    const handleWindowMouseUp = () => {
+      pushHistorySnapshot();
+      setRotateDragState(null);
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [rotateDragState, pushHistorySnapshot]);
+
+  // 5g. CUSTOM USER STAMP / IMAGE STAMP UPLOAD HANDLER
+  const handleCustomStampUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const uploadedFile = e.target.files?.[0];
+    if (!uploadedFile) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      const newStamp: StampBlock = {
+        id: `stamp_custom_${Date.now()}`,
+        type: 'stamp',
+        stampType: 'CUSTOM',
+        customText: uploadedFile.name.replace(/\.[^/.]+$/, ''),
+        imageUrl: dataUrl,
+        pageIndex: currentPage - 1,
+        x: 0.35,
+        y: 0.35,
+        width: 0.25,
+        height: 0.12,
+        color: stampColor,
+        rotation: 0,
+      };
+      const updated = [...stampBlocks, newStamp];
+      setStampBlocks(updated);
+      setSelectedElementId(newStamp.id);
+      pushHistorySnapshot(undefined, undefined, updated);
+      setActiveTool('editText');
+      setExportMessage('Custom stamp uploaded and placed on canvas!');
+      setTimeout(() => setExportMessage(null), 3000);
+    };
+    reader.readAsDataURL(uploadedFile);
+    e.target.value = '';
+  };
+
   // 6. IMAGE INSERTION
   const handleImageInsert = (e: React.ChangeEvent<HTMLInputElement>) => {
     const imgFile = e.target.files?.[0];
@@ -1638,36 +2248,396 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
     pushHistorySnapshot(updated);
   };
 
-  const deleteSelectedElement = () => {
-    if (!selectedElementId) return;
-    const updatedText = textBlocks
-      .map((t) => {
-        if (t.id === selectedElementId) {
-          if (t.isOriginalParsed) return { ...t, isDeleted: true };
-          return null as any;
-        }
-        return t;
-      })
-      .filter(Boolean);
+  const deleteElement = (id: string, type: 'text' | 'shape' | 'stamp' | 'image' | 'whiteout' | 'link' | 'note') => {
+    let updatedText = textBlocks;
+    let updatedShapes = shapeBlocks;
+    let updatedStamps = stampBlocks;
+    let updatedImages = imageBlocks;
+    let updatedWhiteouts = whiteouts;
+    let updatedLinks = linkBlocks;
+    let updatedNotes = noteBlocks;
 
-    const updatedShapes = shapeBlocks.filter((s) => s.id !== selectedElementId);
-    const updatedStamps = stampBlocks.filter((s) => s.id !== selectedElementId);
-    const updatedImages = imageBlocks.filter((i) => i.id !== selectedElementId);
-    const updatedLinks = linkBlocks.filter((l) => l.id !== selectedElementId);
-    const updatedNotes = noteBlocks.filter((n) => n.id !== selectedElementId);
+    if (type === 'text') {
+      updatedText = textBlocks
+        .map((t) => {
+          if (t.id === id) {
+            if (t.isOriginalParsed) return { ...t, isDeleted: true };
+            return null as any;
+          }
+          return t;
+        })
+        .filter(Boolean);
+      setTextBlocks(updatedText);
+    } else if (type === 'shape') {
+      updatedShapes = shapeBlocks.filter((s) => s.id !== id);
+      setShapeBlocks(updatedShapes);
+    } else if (type === 'stamp') {
+      updatedStamps = stampBlocks.filter((s) => s.id !== id);
+      setStampBlocks(updatedStamps);
+    } else if (type === 'image') {
+      updatedImages = imageBlocks.filter((i) => i.id !== id);
+      setImageBlocks(updatedImages);
+    } else if (type === 'whiteout') {
+      updatedWhiteouts = whiteouts.filter((w) => w.id !== id);
+      setWhiteouts(updatedWhiteouts);
+    } else if (type === 'link') {
+      updatedLinks = linkBlocks.filter((l) => l.id !== id);
+      setLinkBlocks(updatedLinks);
+    } else if (type === 'note') {
+      updatedNotes = noteBlocks.filter((n) => n.id !== id);
+      setNoteBlocks(updatedNotes);
+    }
 
-    setTextBlocks(updatedText);
-    setShapeBlocks(updatedShapes);
-    setStampBlocks(updatedStamps);
-    setImageBlocks(updatedImages);
-    setLinkBlocks(updatedLinks);
-    setNoteBlocks(updatedNotes);
-
-    pushHistorySnapshot(updatedText, updatedShapes, updatedStamps, updatedImages, undefined, updatedLinks, updatedNotes);
-    setSelectedElementId(null);
+    if (selectedElementId === id) setSelectedElementId(null);
+    pushHistorySnapshot(
+      updatedText,
+      updatedShapes,
+      updatedStamps,
+      updatedImages,
+      undefined,
+      updatedLinks,
+      updatedNotes,
+      updatedWhiteouts
+    );
   };
 
-  // 9. FIND & REPLACE
+  const deleteSelectedElement = () => {
+    if (!selectedElementId) return;
+    if (textBlocks.some((t) => t.id === selectedElementId)) {
+      deleteElement(selectedElementId, 'text');
+    } else if (shapeBlocks.some((s) => s.id === selectedElementId)) {
+      deleteElement(selectedElementId, 'shape');
+    } else if (stampBlocks.some((st) => st.id === selectedElementId)) {
+      deleteElement(selectedElementId, 'stamp');
+    } else if (imageBlocks.some((i) => i.id === selectedElementId)) {
+      deleteElement(selectedElementId, 'image');
+    } else if (whiteouts.some((w) => w.id === selectedElementId)) {
+      deleteElement(selectedElementId, 'whiteout');
+    } else if (linkBlocks.some((l) => l.id === selectedElementId)) {
+      deleteElement(selectedElementId, 'link');
+    } else if (noteBlocks.some((n) => n.id === selectedElementId)) {
+      deleteElement(selectedElementId, 'note');
+    }
+  };
+
+  const updateSelectedShape = (updates: Partial<ShapeBlock>) => {
+    if (!selectedElementId) return;
+    const updated = shapeBlocks.map((s) => (s.id === selectedElementId ? { ...s, ...updates } : s));
+    setShapeBlocks(updated);
+    pushHistorySnapshot(undefined, updated);
+  };
+
+  const updateSelectedStamp = (updates: Partial<StampBlock>) => {
+    if (!selectedElementId) return;
+    const updated = stampBlocks.map((st) => (st.id === selectedElementId ? { ...st, ...updates } : st));
+    setStampBlocks(updated);
+    pushHistorySnapshot(undefined, undefined, updated);
+  };
+
+  const duplicateSelectedElement = () => {
+    if (!selectedElementId) return;
+    const tb = textBlocks.find((t) => t.id === selectedElementId);
+    if (tb) {
+      const copy: TextBlock = {
+        ...tb,
+        id: `txt_${Date.now()}`,
+        x: Math.min(0.9, tb.x + 0.03),
+        y: Math.min(0.9, tb.y + 0.03),
+        isOriginalParsed: false,
+      };
+      const updated = [...textBlocks, copy];
+      setTextBlocks(updated);
+      setSelectedElementId(copy.id);
+      pushHistorySnapshot(updated);
+      return;
+    }
+    const sh = shapeBlocks.find((s) => s.id === selectedElementId);
+    if (sh) {
+      const copy: ShapeBlock = {
+        ...sh,
+        id: `shape_${Date.now()}`,
+        x: Math.min(0.85, sh.x + 0.03),
+        y: Math.min(0.85, sh.y + 0.03),
+      };
+      const updated = [...shapeBlocks, copy];
+      setShapeBlocks(updated);
+      setSelectedElementId(copy.id);
+      pushHistorySnapshot(undefined, updated);
+      return;
+    }
+    const st = stampBlocks.find((s) => s.id === selectedElementId);
+    if (st) {
+      const copy: StampBlock = {
+        ...st,
+        id: `stamp_${Date.now()}`,
+        x: Math.min(0.85, st.x + 0.03),
+        y: Math.min(0.85, st.y + 0.03),
+      };
+      const updated = [...stampBlocks, copy];
+      setStampBlocks(updated);
+      setSelectedElementId(copy.id);
+      pushHistorySnapshot(undefined, undefined, updated);
+      return;
+    }
+    const im = imageBlocks.find((i) => i.id === selectedElementId);
+    if (im) {
+      const copy: ImageBlock = {
+        ...im,
+        id: `img_${Date.now()}`,
+        x: Math.min(0.85, im.x + 0.03),
+        y: Math.min(0.85, im.y + 0.03),
+      };
+      const updated = [...imageBlocks, copy];
+      setImageBlocks(updated);
+      setSelectedElementId(copy.id);
+      pushHistorySnapshot(undefined, undefined, undefined, updated);
+      return;
+    }
+    const wh = whiteouts.find((w) => w.id === selectedElementId);
+    if (wh) {
+      const copy: WhiteoutBlock = {
+        ...wh,
+        id: `wh_${Date.now()}`,
+        x: Math.min(0.85, wh.x + 0.03),
+        y: Math.min(0.85, wh.y + 0.03),
+      };
+      const updated = [...whiteouts, copy];
+      setWhiteouts(updated);
+      setSelectedElementId(copy.id);
+      pushHistorySnapshot(undefined, undefined, undefined, undefined, undefined, undefined, undefined, updated);
+      return;
+    }
+  };
+
+  // 8c. DESIGN KEYBOARD SHORTCUTS & CANVAS INTERACTION
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl instanceof HTMLInputElement ||
+        activeEl instanceof HTMLTextAreaElement ||
+        (activeEl as HTMLElement)?.isContentEditable;
+
+      // 1. ESCAPE: Deselect active tool / clear element selection / close modals
+      if (e.key === 'Escape') {
+        setSelectedElementId(null);
+        setActiveTool('select');
+        setIsSearchOpen(false);
+        setIsExportModalOpen(false);
+        setIsShortcutsModalOpen(false);
+        return;
+      }
+
+      // 2. UNDO: Ctrl+Z / Cmd+Z (without Shift)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+        if (!isInput) {
+          e.preventDefault();
+          handleUndo();
+          return;
+        }
+      }
+
+      // 3. REDO: Ctrl+Y / Cmd+Y OR Shift+Ctrl+Z / Shift+Cmd+Z
+      if (
+        ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z'))
+      ) {
+        if (!isInput) {
+          e.preventDefault();
+          handleRedo();
+          return;
+        }
+      }
+
+      // 4. COPY: Ctrl+C / Cmd+C (when element selected, not typing in input)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+        if (!isInput && selectedElementId) {
+          e.preventDefault();
+          const tb = textBlocks.find((t) => t.id === selectedElementId);
+          if (tb) {
+            setClipboardElement({ type: 'text', data: tb });
+            setExportMessage('Element copied to clipboard (Ctrl+V to paste)');
+            setTimeout(() => setExportMessage(null), 2000);
+            return;
+          }
+          const sh = shapeBlocks.find((s) => s.id === selectedElementId);
+          if (sh) {
+            setClipboardElement({ type: 'shape', data: sh });
+            setExportMessage('Shape copied to clipboard (Ctrl+V to paste)');
+            setTimeout(() => setExportMessage(null), 2000);
+            return;
+          }
+          const st = stampBlocks.find((s) => s.id === selectedElementId);
+          if (st) {
+            setClipboardElement({ type: 'stamp', data: st });
+            setExportMessage('Stamp copied to clipboard (Ctrl+V to paste)');
+            setTimeout(() => setExportMessage(null), 2000);
+            return;
+          }
+          const im = imageBlocks.find((i) => i.id === selectedElementId);
+          if (im) {
+            setClipboardElement({ type: 'image', data: im });
+            setExportMessage('Image copied to clipboard (Ctrl+V to paste)');
+            setTimeout(() => setExportMessage(null), 2000);
+            return;
+          }
+          const wh = whiteouts.find((w) => w.id === selectedElementId);
+          if (wh) {
+            setClipboardElement({ type: 'whiteout', data: wh });
+            setExportMessage('Whiteout copied to clipboard (Ctrl+V to paste)');
+            setTimeout(() => setExportMessage(null), 2000);
+            return;
+          }
+        }
+      }
+
+      // 5. PASTE: Ctrl+V / Cmd+V
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+        if (!isInput && clipboardElement) {
+          e.preventDefault();
+          const offset = 0.03;
+          if (clipboardElement.type === 'text') {
+            const copy: TextBlock = {
+              ...clipboardElement.data,
+              id: `txt_${Date.now()}`,
+              pageIndex: currentPage - 1,
+              x: Math.min(0.9, clipboardElement.data.x + offset),
+              y: Math.min(0.9, clipboardElement.data.y + offset),
+              isOriginalParsed: false,
+            };
+            const updated = [...textBlocks, copy];
+            setTextBlocks(updated);
+            setSelectedElementId(copy.id);
+            pushHistorySnapshot(updated);
+          } else if (clipboardElement.type === 'shape') {
+            const copy: ShapeBlock = {
+              ...clipboardElement.data,
+              id: `shape_${Date.now()}`,
+              pageIndex: currentPage - 1,
+              x: Math.min(0.85, clipboardElement.data.x + offset),
+              y: Math.min(0.85, clipboardElement.data.y + offset),
+            };
+            const updated = [...shapeBlocks, copy];
+            setShapeBlocks(updated);
+            setSelectedElementId(copy.id);
+            pushHistorySnapshot(undefined, updated);
+          } else if (clipboardElement.type === 'stamp') {
+            const copy: StampBlock = {
+              ...clipboardElement.data,
+              id: `stamp_${Date.now()}`,
+              pageIndex: currentPage - 1,
+              x: Math.min(0.85, clipboardElement.data.x + offset),
+              y: Math.min(0.85, clipboardElement.data.y + offset),
+            };
+            const updated = [...stampBlocks, copy];
+            setStampBlocks(updated);
+            setSelectedElementId(copy.id);
+            pushHistorySnapshot(undefined, undefined, updated);
+          } else if (clipboardElement.type === 'image') {
+            const copy: ImageBlock = {
+              ...clipboardElement.data,
+              id: `img_${Date.now()}`,
+              pageIndex: currentPage - 1,
+              x: Math.min(0.85, clipboardElement.data.x + offset),
+              y: Math.min(0.85, clipboardElement.data.y + offset),
+            };
+            const updated = [...imageBlocks, copy];
+            setImageBlocks(updated);
+            setSelectedElementId(copy.id);
+            pushHistorySnapshot(undefined, undefined, undefined, updated);
+          } else if (clipboardElement.type === 'whiteout') {
+            const copy: any = {
+              ...clipboardElement.data,
+              id: `wh_${Date.now()}`,
+              pageIndex: currentPage - 1,
+              x: Math.min(0.85, clipboardElement.data.x + offset),
+              y: Math.min(0.85, clipboardElement.data.y + offset),
+            };
+            const updated = [...whiteouts, copy];
+            setWhiteouts(updated);
+            setSelectedElementId(copy.id);
+            pushHistorySnapshot(undefined, undefined, undefined, undefined, undefined, undefined, undefined, updated);
+          }
+          return;
+        }
+      }
+
+      // 6. DELETE / BACKSPACE: Instantly delete currently selected canvas element (if not typing in text field)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (!isInput && selectedElementId) {
+          e.preventDefault();
+          deleteSelectedElement();
+          return;
+        }
+      }
+
+      // 7. ARROW KEYS: Nudge selected element by 1px (or 10px with Shift held)
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (!isInput && selectedElementId) {
+          e.preventDefault();
+          const pw = pageDimensions.width || 800;
+          const ph = pageDimensions.height || 1000;
+          const stepPx = e.shiftKey ? 10 : 1;
+          const dx = e.key === 'ArrowLeft' ? -stepPx / pw : e.key === 'ArrowRight' ? stepPx / pw : 0;
+          const dy = e.key === 'ArrowUp' ? -stepPx / ph : e.key === 'ArrowDown' ? stepPx / ph : 0;
+
+          setTextBlocks((prev) =>
+            prev.map((t) =>
+              t.id === selectedElementId
+                ? { ...t, x: Math.max(0, Math.min(0.95, t.x + dx)), y: Math.max(0, Math.min(0.95, t.y + dy)) }
+                : t
+            )
+          );
+          setShapeBlocks((prev) =>
+            prev.map((s) =>
+              s.id === selectedElementId
+                ? { ...s, x: Math.max(0, Math.min(0.95, s.x + dx)), y: Math.max(0, Math.min(0.95, s.y + dy)) }
+                : s
+            )
+          );
+          setStampBlocks((prev) =>
+            prev.map((st) =>
+              st.id === selectedElementId
+                ? { ...st, x: Math.max(0, Math.min(0.95, st.x + dx)), y: Math.max(0, Math.min(0.95, st.y + dy)) }
+                : st
+            )
+          );
+          setImageBlocks((prev) =>
+            prev.map((im) =>
+              im.id === selectedElementId
+                ? { ...im, x: Math.max(0, Math.min(0.95, im.x + dx)), y: Math.max(0, Math.min(0.95, im.y + dy)) }
+                : im
+            )
+          );
+          setWhiteouts((prev) =>
+            prev.map((w) =>
+              w.id === selectedElementId
+                ? { ...w, x: Math.max(0, Math.min(0.95, w.x + dx)), y: Math.max(0, Math.min(0.95, w.y + dy)) }
+                : w
+            )
+          );
+          pushHistorySnapshot();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    selectedElementId,
+    clipboardElement,
+    currentPage,
+    textBlocks,
+    shapeBlocks,
+    stampBlocks,
+    imageBlocks,
+    whiteouts,
+    pageDimensions,
+    handleUndo,
+    handleRedo,
+    deleteSelectedElement,
+    pushHistorySnapshot,
+  ]);
   const handleGlobalFindReplace = () => {
     if (!searchQuery.trim()) return;
     let count = 0;
@@ -1695,7 +2665,7 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
   };
 
   // 11. ONE-CLICK CRISP PDF EXPORT
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (compressed: boolean = false) => {
     if (!file || pagesList.length === 0) return;
     setIsExporting(true);
     setError(null);
@@ -1777,13 +2747,21 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
           });
         }
 
-        // 3. Draw Shapes & Highlights
+        // 3. Draw Shapes, Lines, and Highlights
         const pageShapes = shapeBlocks.filter((sh) => sh.pageIndex === idx);
         for (const sh of pageShapes) {
           const r = parseInt(sh.strokeColor.slice(1, 3), 16) / 255 || 0;
           const g = parseInt(sh.strokeColor.slice(3, 5), 16) / 255 || 0;
           const b = parseInt(sh.strokeColor.slice(5, 7), 16) / 255 || 0;
           const strokeRgb = rgb(r, g, b);
+
+          let fillRgb: any = undefined;
+          if (sh.fillColor && sh.fillColor !== 'transparent' && sh.fillColor.startsWith('#')) {
+            const fr = parseInt(sh.fillColor.slice(1, 3), 16) / 255 || 0;
+            const fg = parseInt(sh.fillColor.slice(3, 5), 16) / 255 || 0;
+            const fb = parseInt(sh.fillColor.slice(5, 7), 16) / 255 || 0;
+            fillRgb = rgb(fr, fg, fb);
+          }
 
           const shX = sh.x * width;
           const shY = height - sh.y * height - sh.height * height;
@@ -1798,6 +2776,7 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
               height: shH,
               borderColor: strokeRgb,
               borderWidth: sh.strokeWidth,
+              color: fillRgb,
               opacity: sh.opacity,
             });
           } else if (sh.shapeType === 'circle') {
@@ -1808,51 +2787,164 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
               yScale: shH / 2,
               borderColor: strokeRgb,
               borderWidth: sh.strokeWidth,
+              color: fillRgb,
               opacity: sh.opacity,
             });
-          } else if (sh.shapeType === 'line' || sh.shapeType === 'arrow') {
+          } else if (
+            sh.shapeType === 'line' ||
+            sh.shapeType === 'dashed-line' ||
+            sh.shapeType === 'dotted-line' ||
+            sh.shapeType === 'arrow' ||
+            sh.shapeType === 'double-arrow'
+          ) {
+            const lineMidY = shY + shH / 2;
             copiedPage.drawLine({
-              start: { x: shX, y: shY + shH / 2 },
-              end: { x: shX + shW, y: shY + shH / 2 },
+              start: { x: shX, y: lineMidY },
+              end: { x: shX + shW, y: lineMidY },
               thickness: sh.strokeWidth,
               color: strokeRgb,
               opacity: sh.opacity,
             });
+
+            // Draw arrow heads for arrow and double-arrow
+            if (sh.shapeType === 'arrow' || sh.shapeType === 'double-arrow') {
+              copiedPage.drawLine({
+                start: { x: shX + shW, y: lineMidY },
+                end: { x: shX + shW - 8, y: lineMidY + 5 },
+                thickness: sh.strokeWidth,
+                color: strokeRgb,
+                opacity: sh.opacity,
+              });
+              copiedPage.drawLine({
+                start: { x: shX + shW, y: lineMidY },
+                end: { x: shX + shW - 8, y: lineMidY - 5 },
+                thickness: sh.strokeWidth,
+                color: strokeRgb,
+                opacity: sh.opacity,
+              });
+            }
+            if (sh.shapeType === 'double-arrow') {
+              copiedPage.drawLine({
+                start: { x: shX, y: lineMidY },
+                end: { x: shX + 8, y: lineMidY + 5 },
+                thickness: sh.strokeWidth,
+                color: strokeRgb,
+                opacity: sh.opacity,
+              });
+              copiedPage.drawLine({
+                start: { x: shX, y: lineMidY },
+                end: { x: shX + 8, y: lineMidY - 5 },
+                thickness: sh.strokeWidth,
+                color: strokeRgb,
+                opacity: sh.opacity,
+              });
+            }
           }
         }
 
-        // 4. Draw Stamps
-        const pageStamps = stampBlocks.filter((st) => st.pageIndex === idx);
-        for (const st of pageStamps) {
+        // 3b. Draw Freehand Strokes & Highlighter Strokes
+        const pageDraws = drawStrokes.filter((st) => st.pageIndex === idx);
+        for (const st of pageDraws) {
           const r = parseInt(st.color.slice(1, 3), 16) / 255 || 0;
           const g = parseInt(st.color.slice(3, 5), 16) / 255 || 0;
           const b = parseInt(st.color.slice(5, 7), 16) / 255 || 0;
-          const stRgb = rgb(r, g, b);
+          const strokeRgb = rgb(r, g, b);
+          const strokeOp = st.opacity ?? (st.isHighlighter ? 0.45 : 1);
 
+          for (let i = 1; i < st.points.length; i++) {
+            const p1 = st.points[i - 1];
+            const p2 = st.points[i];
+            copiedPage.drawLine({
+              start: { x: p1.x * width, y: height - p1.y * height },
+              end: { x: p2.x * width, y: height - p2.y * height },
+              thickness: st.strokeWidth,
+              color: strokeRgb,
+              opacity: strokeOp,
+            });
+          }
+        }
+
+        // 4. Draw Stamps (Presets, Custom Text, and Uploaded Image Stamps)
+        const pageStamps = stampBlocks.filter((st) => st.pageIndex === idx);
+        for (const st of pageStamps) {
           const stX = st.x * width;
           const stY = height - st.y * height - st.height * height;
           const stW = st.width * width;
           const stH = st.height * height;
 
+          if (st.imageUrl) {
+            try {
+              const bytes = await fetch(st.imageUrl).then((r) => r.arrayBuffer());
+              let embeddedStamp: any = null;
+              if (st.imageUrl.includes('image/png') || st.imageUrl.includes('image/svg')) {
+                embeddedStamp = await outDoc.embedPng(bytes);
+              } else {
+                embeddedStamp = await outDoc.embedJpg(bytes);
+              }
+              if (embeddedStamp) {
+                copiedPage.drawImage(embeddedStamp, {
+                  x: stX,
+                  y: stY,
+                  width: stW,
+                  height: stH,
+                  rotate: degrees(st.rotation || 0),
+                });
+              }
+            } catch (err) {
+              console.warn('[Embed Custom Stamp Error]', err);
+            }
+            continue;
+          }
+
+          const r = parseInt(st.color.slice(1, 3), 16) / 255 || 0;
+          const g = parseInt(st.color.slice(3, 5), 16) / 255 || 0;
+          const b = parseInt(st.color.slice(5, 7), 16) / 255 || 0;
+          const stRgb = rgb(r, g, b);
+
+          // Outer Border
           copiedPage.drawRectangle({
             x: stX,
             y: stY,
             width: stW,
             height: stH,
             borderColor: stRgb,
-            borderWidth: 2,
+            borderWidth: st.borderStyle === 'double' ? 3 : 2,
             rotate: degrees(st.rotation || -6),
           });
 
-          const label = st.stampType === 'CUSTOM' ? st.customText || 'APPROVED' : st.stampType;
+          // Inner Border if double
+          if (st.borderStyle === 'double' && stW > 8 && stH > 8) {
+            copiedPage.drawRectangle({
+              x: stX + 3,
+              y: stY + 3,
+              width: stW - 6,
+              height: stH - 6,
+              borderColor: stRgb,
+              borderWidth: 1,
+              rotate: degrees(st.rotation || -6),
+            });
+          }
+
+          const label = st.stampType === 'CUSTOM' ? st.customText || 'APPROVED' : st.customText || st.stampType;
           copiedPage.drawText(label, {
             x: stX + 8,
-            y: stY + stH / 3,
-            size: 14,
+            y: stY + (st.showDate && st.dateText ? stH / 2 : stH / 3),
+            size: Math.max(10, Math.min(16, Math.round(stH * 0.4))),
             font: helveticaBold,
             color: stRgb,
             rotate: degrees(st.rotation || -6),
           });
+
+          if (st.showDate && st.dateText) {
+            copiedPage.drawText(st.dateText, {
+              x: stX + 8,
+              y: stY + stH * 0.18,
+              size: Math.max(8, Math.min(10, Math.round(stH * 0.25))),
+              font: helveticaFont,
+              color: stRgb,
+              rotate: degrees(st.rotation || -6),
+            });
+          }
         }
 
         // 5. Draw Images & Signatures
@@ -1916,23 +3008,345 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
         }
       }
 
-      const pdfBytes = await outDoc.save();
+      const pdfBytes = await outDoc.save(compressed ? { useObjectStreams: true } : {});
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `edited-${file.name}`;
+      const baseName = (file?.name || 'document').replace(/\.[^/.]+$/, '');
+      a.download = compressed ? `${baseName}_web_optimized.pdf` : `${baseName}_edited.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
-      setExportMessage('🎉 Modified PDF exported with 100% crisp vector fidelity!');
+      setIsExportModalOpen(false);
+      setExportMessage(
+        compressed
+          ? '⚡ Web-optimized compressed PDF exported successfully!'
+          : '🎉 Modified PDF exported with 100% crisp vector fidelity!'
+      );
       setTimeout(() => setExportMessage(null), 4000);
     } catch (err: any) {
       console.error('[Export PDF Error]', err);
       setError(err?.message || 'Failed to export customized PDF.');
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  // 11b. HIGH-RESOLUTION CANVAS PAGE IMAGE EXPORT (PNG / JPEG)
+  const handleExportImage = async (imgFormat: 'png' | 'jpeg', quality: number = 0.95) => {
+    if (!canvasRef.current || !containerRef.current) {
+      setError('Cannot capture canvas: Document not ready');
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const pdfCanvas = canvasRef.current;
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = pdfCanvas.width || pageDimensions.width || 800;
+      exportCanvas.height = pdfCanvas.height || pageDimensions.height || 1000;
+      const ctx = exportCanvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to create canvas context');
+
+      // 1. If JPEG, fill crisp white background
+      if (imgFormat === 'jpeg') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+      }
+
+      // 2. Draw underlying rendered PDF raster
+      ctx.drawImage(pdfCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
+
+      const W = exportCanvas.width;
+      const H = exportCanvas.height;
+      const pageIdx = currentPage - 1;
+
+      // 3. Draw whiteouts on current page
+      ctx.fillStyle = '#ffffff';
+      for (const wh of whiteouts.filter((w) => w.pageIndex === pageIdx)) {
+        ctx.fillRect(wh.x * W, wh.y * H, wh.width * W, wh.height * H);
+      }
+
+      // 4. Draw freehand strokes & natural highlights on current page
+      const pageDraws = drawStrokes.filter((st) => st.pageIndex === pageIdx);
+      for (const st of pageDraws) {
+        if (st.points.length < 2) continue;
+        ctx.save();
+        ctx.strokeStyle = st.color;
+        ctx.lineWidth = st.strokeWidth * (W / (pageDimensions.width || 800));
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = st.opacity ?? 1;
+        if (st.isHighlighter) {
+          ctx.globalCompositeOperation = 'multiply';
+        }
+        ctx.beginPath();
+        ctx.moveTo(st.points[0].x * W, st.points[0].y * H);
+        for (let i = 1; i < st.points.length; i++) {
+          ctx.lineTo(st.points[i].x * W, st.points[i].y * H);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 5. Draw shapes on current page
+      const pageShapes = shapeBlocks.filter((sh) => sh.pageIndex === pageIdx);
+      for (const sh of pageShapes) {
+        ctx.save();
+        ctx.globalAlpha = sh.opacity;
+        const shX = sh.x * W;
+        const shY = sh.y * H;
+        const shW = sh.width * W;
+        const shH = sh.height * H;
+        ctx.translate(shX + shW / 2, shY + shH / 2);
+        if (sh.rotation) ctx.rotate((sh.rotation * Math.PI) / 180);
+        ctx.translate(-(shX + shW / 2), -(shY + shH / 2));
+
+        ctx.strokeStyle = sh.strokeColor;
+        ctx.lineWidth = Math.max(1, sh.strokeWidth * (W / (pageDimensions.width || 800)));
+
+        if (sh.shapeType === 'dashed-line') ctx.setLineDash([8, 6]);
+        if (sh.shapeType === 'dotted-line') ctx.setLineDash([2, 6]);
+
+        if (sh.shapeType === 'rectangle' || sh.shapeType === 'highlight') {
+          if (sh.fillColor && sh.fillColor !== 'transparent') {
+            ctx.fillStyle = sh.fillColor;
+            ctx.fillRect(shX, shY, shW, shH);
+          }
+          if (sh.shapeType === 'rectangle') {
+            ctx.strokeRect(shX, shY, shW, shH);
+          }
+        } else if (sh.shapeType === 'circle') {
+          ctx.beginPath();
+          ctx.ellipse(shX + shW / 2, shY + shH / 2, shW / 2, shH / 2, 0, 0, 2 * Math.PI);
+          if (sh.fillColor && sh.fillColor !== 'transparent') {
+            ctx.fillStyle = sh.fillColor;
+            ctx.fill();
+          }
+          ctx.stroke();
+        } else if (sh.shapeType === 'triangle') {
+          ctx.beginPath();
+          ctx.moveTo(shX + shW / 2, shY);
+          ctx.lineTo(shX + shW, shY + shH);
+          ctx.lineTo(shX, shY + shH);
+          ctx.closePath();
+          if (sh.fillColor && sh.fillColor !== 'transparent') {
+            ctx.fillStyle = sh.fillColor;
+            ctx.fill();
+          }
+          ctx.stroke();
+        } else {
+          // Lines & arrows
+          const midY = shY + shH / 2;
+          ctx.beginPath();
+          ctx.moveTo(shX, midY);
+          ctx.lineTo(shX + shW, midY);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // 6. Draw stamps on current page
+      const pageStamps = stampBlocks.filter((s) => s.pageIndex === pageIdx);
+      for (const st of pageStamps) {
+        ctx.save();
+        const stX = st.x * W;
+        const stY = st.y * H;
+        const stW = st.width * W;
+        const stH = st.height * H;
+        ctx.translate(stX + stW / 2, stY + stH / 2);
+        if (st.rotation) ctx.rotate((st.rotation * Math.PI) / 180);
+        ctx.translate(-(stX + stW / 2), -(stY + stH / 2));
+
+        if (st.imageUrl) {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.src = st.imageUrl;
+          await new Promise((res) => {
+            img.onload = res;
+            img.onerror = res;
+          });
+          ctx.drawImage(img, stX, stY, stW, stH);
+        } else {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+          ctx.fillRect(stX, stY, stW, stH);
+          ctx.strokeStyle = st.color;
+          ctx.lineWidth = st.borderStyle === 'double' ? 4 : 2;
+          ctx.strokeRect(stX, stY, stW, stH);
+          if (st.borderStyle === 'double') {
+            ctx.lineWidth = 1;
+            ctx.strokeRect(stX + 3, stY + 3, stW - 6, stH - 6);
+          }
+          ctx.fillStyle = st.color;
+          ctx.font = `bold ${Math.round(stH * 0.35)}px Arial, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const txt = st.stampType === 'CUSTOM' ? st.customText || 'APPROVED' : st.stampType;
+          ctx.fillText(txt, stX + stW / 2, stY + (st.showDate ? stH * 0.4 : stH / 2));
+          if (st.showDate && st.dateText) {
+            ctx.font = `${Math.round(stH * 0.2)}px Arial, sans-serif`;
+            ctx.fillText(st.dateText, stX + stW / 2, stY + stH * 0.75);
+          }
+        }
+        ctx.restore();
+      }
+
+      // 7. Draw text blocks on current page
+      const pageTexts = textBlocks.filter((t) => t.pageIndex === pageIdx && !t.isDeleted);
+      for (const tb of pageTexts) {
+        const origX = tb.originalX ?? tb.x;
+        const origY = tb.originalY ?? tb.y;
+        const wasMoved = tb.isOriginalParsed && (Math.abs(tb.x - origX) > 0.002 || Math.abs(tb.y - origY) > 0.002);
+        const needsDraw =
+          !tb.isOriginalParsed ||
+          wasMoved ||
+          tb.text !== tb.originalText ||
+          tb.color !== '#000000' ||
+          tb.isBold ||
+          tb.isItalic ||
+          tb.isUnderline ||
+          (tb.backgroundColor && tb.backgroundColor !== 'transparent');
+
+        if (needsDraw) {
+          ctx.save();
+          const tbX = tb.x * W;
+          const tbY = tb.y * H;
+          const tbW = (tb.width || 0.1) * W;
+          const tbH = (tb.height || 0.03) * H;
+          if (tb.backgroundColor && tb.backgroundColor !== 'transparent') {
+            ctx.fillStyle = tb.backgroundColor;
+            ctx.fillRect(tbX, tbY, tbW, tbH);
+          }
+          ctx.fillStyle = tb.color || '#000000';
+          const fStyle = tb.isItalic ? 'italic ' : '';
+          const fWeight = tb.isBold ? 'bold ' : 'normal ';
+          const fSize = Math.round(tb.fontSize * (W / (pageDimensions.width || 800)));
+          ctx.font = `${fStyle}${fWeight}${fSize}px ${tb.fontFamily || 'Arial, sans-serif'}`;
+          ctx.textBaseline = 'top';
+          ctx.fillText(tb.text, tbX, tbY);
+          ctx.restore();
+        }
+      }
+
+      // 8. Convert to Blob & Download
+      const mime = imgFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const ext = imgFormat === 'jpeg' ? 'jpg' : 'png';
+      exportCanvas.toBlob(
+        (blob) => {
+          if (!blob) throw new Error('Failed to generate image blob');
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${(file?.name || 'document').replace(/\.[^/.]+$/, '')}_page_${currentPage}.${ext}`;
+          link.click();
+          URL.revokeObjectURL(url);
+          setExportMessage(`Page ${currentPage} successfully exported as ${ext.toUpperCase()}!`);
+          setTimeout(() => setExportMessage(null), 3500);
+          setIsExportModalOpen(false);
+        },
+        mime,
+        quality
+      );
+    } catch (err: any) {
+      console.error('[Export Image Error]', err);
+      setError(`Failed to export image: ${err?.message || err}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // 11c. EXPORT EDITABLE TEXT / OCR AS TXT OR JSON
+  const handleExportText = (format: 'txt' | 'json') => {
+    try {
+      const baseName = (file?.name || 'document').replace(/\.[^/.]+$/, '');
+      if (format === 'txt') {
+        let fullText = `=== DOCUMENT: ${file?.name || 'Document'} ===\n`;
+        fullText += `Export Date: ${new Date().toLocaleString()}\n`;
+        fullText += `Total Pages: ${pagesList.length}\n\n`;
+
+        for (let idx = 0; idx < pagesList.length; idx++) {
+          fullText += `--------------------------------------------------\n`;
+          fullText += `PAGE ${idx + 1}\n`;
+          fullText += `--------------------------------------------------\n\n`;
+          const pageTexts = textBlocks
+            .filter((t) => t.pageIndex === idx && !t.isDeleted)
+            .sort((a, b) => a.y - b.y || a.x - b.x);
+          if (pageTexts.length === 0) {
+            fullText += `[No editable text elements on this page]\n\n`;
+          } else {
+            for (const t of pageTexts) {
+              fullText += `${t.text}\n`;
+            }
+            fullText += `\n`;
+          }
+
+          const pageNotes = noteBlocks.filter((n) => n.pageIndex === idx);
+          if (pageNotes.length > 0) {
+            fullText += `[Notes & Annotations]:\n`;
+            pageNotes.forEach((n, i) => {
+              fullText += `  Note ${i + 1}: ${n.content}\n`;
+            });
+            fullText += `\n`;
+          }
+        }
+
+        const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${baseName}_transcript.txt`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const docJson = {
+          fileName: file?.name || 'Document',
+          exportedAt: new Date().toISOString(),
+          totalPages: pagesList.length,
+          pages: pagesList.map((p, idx) => ({
+            pageNumber: idx + 1,
+            rotation: p.rotation,
+            textBlocks: textBlocks
+              .filter((t) => t.pageIndex === idx && !t.isDeleted)
+              .map((t) => ({
+                text: t.text,
+                x: t.x,
+                y: t.y,
+                fontSize: t.fontSize,
+                color: t.color,
+                isBold: t.isBold,
+                isItalic: t.isItalic,
+                fontFamily: t.fontFamily,
+                isOriginalParsed: t.isOriginalParsed,
+              })),
+            notes: noteBlocks
+              .filter((n) => n.pageIndex === idx)
+              .map((n) => ({ content: n.content, x: n.x, y: n.y })),
+            stamps: stampBlocks
+              .filter((s) => s.pageIndex === idx)
+              .map((s) => ({ stampType: s.stampType, customText: s.customText, x: s.x, y: s.y, rotation: s.rotation })),
+            shapes: shapeBlocks
+              .filter((sh) => sh.pageIndex === idx)
+              .map((sh) => ({ shapeType: sh.shapeType, strokeColor: sh.strokeColor, x: sh.x, y: sh.y, width: sh.width, height: sh.height })),
+          })),
+        };
+
+        const blob = new Blob([JSON.stringify(docJson, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${baseName}_data.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      setExportMessage(`Successfully exported document as ${format.toUpperCase()}!`);
+      setTimeout(() => setExportMessage(null), 3000);
+      setIsExportModalOpen(false);
+    } catch (err: any) {
+      console.error('[Export Text Error]', err);
+      setError(`Failed to export text: ${err?.message || err}`);
     }
   };
 
@@ -1965,6 +3379,76 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
     } finally {
       setIsAiThinking(false);
     }
+  };
+
+  const selectedShape = shapeBlocks.find((s) => s.id === selectedElementId);
+  const selectedStamp = stampBlocks.find((s) => s.id === selectedElementId);
+  const selectedText = textBlocks.find((t) => t.id === selectedElementId);
+  const selectedImage = imageBlocks.find((i) => i.id === selectedElementId);
+
+  // 8-Point Universal Transform Handles (Corners and Edges) + 360° Rotation Control Handle
+  const renderTransformHandles = (
+    id: string,
+    type: 'text' | 'shape' | 'image' | 'stamp' | 'whiteout',
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    rotation: number = 0
+  ) => {
+    if (selectedElementId !== id) return null;
+    const handles: { type: HandleType; className: string; cursor: string }[] = [
+      { type: 'nw', className: '-top-1.5 -left-1.5', cursor: 'cursor-nwse-resize' },
+      { type: 'n', className: '-top-1.5 left-1/2 -translate-x-1/2', cursor: 'cursor-ns-resize' },
+      { type: 'ne', className: '-top-1.5 -right-1.5', cursor: 'cursor-nesw-resize' },
+      { type: 'e', className: 'top-1/2 -translate-y-1/2 -right-1.5', cursor: 'cursor-ew-resize' },
+      { type: 'se', className: '-bottom-1.5 -right-1.5', cursor: 'cursor-nwse-resize' },
+      { type: 's', className: '-bottom-1.5 left-1/2 -translate-x-1/2', cursor: 'cursor-ns-resize' },
+      { type: 'sw', className: '-bottom-1.5 -left-1.5', cursor: 'cursor-nesw-resize' },
+      { type: 'w', className: 'top-1/2 -translate-y-1/2 -left-1.5', cursor: 'cursor-ew-resize' },
+    ];
+
+    const pw = pageDimensions.width || 800;
+    const ph = pageDimensions.height || 1000;
+    const pixelW = Math.round(width * pw);
+    const pixelH = Math.round(height * ph);
+
+    return (
+      <>
+        {/* Bounding box outline */}
+        <div className="absolute -inset-0.5 pointer-events-none border border-violet-500 border-dashed rounded-xs z-30" />
+
+        {/* 360-Degree Interactive Rotation Control Handle (Stem + Knob) */}
+        {type !== 'whiteout' && (
+          <div className="absolute left-1/2 -translate-x-1/2 -top-7 flex flex-col items-center z-50">
+            <div
+              onMouseDown={(e) => startRotating(e, id, type, x, y, width, height, rotation)}
+              className="w-4 h-4 rounded-full bg-violet-600 hover:bg-violet-700 text-white border-2 border-white shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+              title={`Rotate (${rotation || 0}°) - Drag to rotate (Hold Shift to snap 15°)`}
+            >
+              <RotateCw className="w-2.5 h-2.5 pointer-events-none" />
+            </div>
+            <div className="w-0.5 h-2.5 bg-violet-500 pointer-events-none" />
+          </div>
+        )}
+
+        {/* 8-Point Universal Transform Handles */}
+        {handles.map((h) => (
+          <div
+            key={h.type}
+            onMouseDown={(e) => startResizing(e, h.type, id, type, x, y, width, height)}
+            className={`absolute w-2.5 h-2.5 bg-white border-2 border-violet-600 rounded-full shadow-xs z-50 ${h.className} ${h.cursor} hover:scale-125 transition-transform`}
+            title={`Resize ${h.type.toUpperCase()}`}
+          />
+        ))}
+
+        {/* Dynamic Dimension Callout Label */}
+        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow pointer-events-none whitespace-nowrap z-50 flex items-center gap-1">
+          <span>{pixelW} × {pixelH} px</span>
+          {rotation ? <span className="text-violet-300 font-semibold">({rotation}°)</span> : null}
+        </div>
+      </>
+    );
   };
 
   return (
@@ -2075,44 +3559,57 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
           <button
             type="button"
             onClick={() => setActiveTool('draw')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
               activeTool === 'draw'
-                ? 'bg-violet-100 text-violet-700 font-bold'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100'
+                ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 font-bold border border-violet-300'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
-            title="Draw Freehand"
+            title="Draw Freehand (Pencil, Pen, Calligraphy, Brush)"
           >
-            <PenTool className="w-4 h-4" />
+            <PenTool className="w-4 h-4 text-violet-600" />
             <span>Draw</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTool('line')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
-              activeTool === 'line'
-                ? 'bg-violet-100 text-violet-700 font-bold'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100'
+            onClick={() => setActiveTool('eraser')}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              activeTool === 'eraser'
+                ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold border border-rose-300'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
-            title="Draw Line or Shapes"
+            title="Eraser (Precision Collision Eraser & 1-Click Object Eraser)"
           >
-            <Minus className="w-4 h-4" />
-            <span>Line</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
+            <Eraser className="w-4 h-4 text-rose-600" />
+            <span>Eraser</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTool('line')}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              activeTool === 'line'
+                ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 font-bold border border-violet-300'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+            title="Draw Line or Shapes (Solid, Dashed, Dotted, Arrows, Rectangle, Circle, Triangle)"
+          >
+            <Minus className="w-4 h-4 text-blue-600" />
+            <span>Shapes & Lines</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTool('highlight')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
               activeTool === 'highlight'
-                ? 'bg-violet-100 text-violet-700 font-bold'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100'
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold border border-amber-300'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
-            title="Text highlight"
+            title="Natural Text Highlighter (Freehand brush & box area)"
           >
             <Highlighter className="w-4 h-4 text-amber-500" />
-            <span>Text highlight</span>
+            <span>Highlight</span>
           </button>
 
           <button
@@ -2268,177 +3765,776 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
 
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => setIsShortcutsModalOpen(true)}
+            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            title="Keyboard Shortcuts & Canvas Controls"
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsExportModalOpen(true)}
             disabled={isExporting}
-            className="ml-1 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+            className="ml-1 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+            title="Export & Save Options (Vector PDF, Web PDF, High-Res Image, Text/JSON)"
           >
             {isExporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            <span>Export PDF</span>
+            <span>Export / Save</span>
           </button>
         </div>
       </div>
 
-      {/* 2. SUB-TOOLBAR / TEXT FORMATTING INSPECTOR (MATCHING SCREENSHOT) */}
-      <div className="h-11 px-4 bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs select-none">
-        {/* LEFT FORMATTING CONTROLS */}
-        <div className="flex items-center gap-3">
-          {/* FONT SIZE CONTROLS */}
-          <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-            <span className="text-slate-500 font-bold text-xs">T</span>
-            <button
-              onClick={() => updateSelectedText({ fontSize: Math.max(8, fontSize - 1) })}
-              className="px-1 hover:text-violet-600 font-black"
-            >
-              -
-            </button>
-            <span className="font-bold min-w-[20px] text-center">{fontSize}</span>
-            <button
-              onClick={() => updateSelectedText({ fontSize: Math.min(72, fontSize + 1) })}
-              className="px-1 hover:text-violet-600 font-black"
-            >
-              +
-            </button>
-          </div>
-
-          {/* BOX / HIGHLIGHT BACKGROUND COLOR */}
-          <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-            <SquareIcon className="w-3.5 h-3.5 text-slate-500" />
-            <input
-              type="color"
-              value={bgColor === 'transparent' ? '#ffffff' : bgColor}
-              onChange={(e) => {
-                setBgColor(e.target.value);
-                updateSelectedText({ backgroundColor: e.target.value });
-              }}
-              className="w-4 h-4 rounded cursor-pointer border-0 p-0"
-              title="Box Background / Highlight Color"
-            />
-          </div>
-
-          {/* TEXT COLOR PICKER (SOLID CIRCLE) */}
-          <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-            <div
-              className="w-4 h-4 rounded-full border border-slate-400 cursor-pointer shadow-xs"
-              style={{ backgroundColor: textColor }}
-              title="Current Text Color"
-            />
-            <input
-              type="color"
-              value={textColor}
-              onChange={(e) => {
-                setTextColor(e.target.value);
-                updateSelectedText({ color: e.target.value });
-              }}
-              className="w-4 h-4 rounded cursor-pointer border-0 p-0"
-              title="Choose Custom Color"
-            />
-            <div className="flex items-center gap-1 ml-1">
-              {PRESET_COLORS.slice(0, 4).map((c) => (
+      {/* 2. SUB-TOOLBAR / DYNAMIC CONTEXTUAL PROPERTY INSPECTOR */}
+      <div className="h-11 px-4 bg-slate-50 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs select-none overflow-x-auto scrollbar-none">
+        {/* Left Section: Context-Aware Controls */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* A. PEN & MULTI-BRUSH SUITE */}
+          {activeTool === 'draw' && (
+            <div className="flex items-center gap-2">
+              {/* Multi-Brush Type Selector */}
+              <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 shadow-2xs">
                 <button
-                  key={c.hex}
+                  type="button"
                   onClick={() => {
-                    setTextColor(c.hex);
-                    updateSelectedText({ color: c.hex });
+                    setBrushType('pencil');
+                    setPenWidth(1.5);
+                    setPenOpacity(0.85);
                   }}
-                  className="w-3 h-3 rounded-full border border-slate-300"
-                  style={{ backgroundColor: c.hex }}
-                  title={c.name}
+                  className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${
+                    brushType === 'pencil' ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 font-bold' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Pencil (Fine textured stroke 1-2px)"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Pencil</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBrushType('pen');
+                    setPenWidth(3);
+                    setPenOpacity(1.0);
+                  }}
+                  className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${
+                    brushType === 'pen' ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 font-bold' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Pen (Crisp uniform stroke)"
+                >
+                  <PenTool className="w-3.5 h-3.5" />
+                  <span>Pen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBrushType('calligraphy');
+                    setPenWidth(6);
+                    setPenOpacity(0.95);
+                  }}
+                  className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${
+                    brushType === 'calligraphy' ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 font-bold' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Calligraphy (Chisel angled nib)"
+                >
+                  <Paintbrush className="w-3.5 h-3.5" />
+                  <span>Calligraphy</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBrushType('brush');
+                    setPenWidth(12);
+                    setPenOpacity(0.8);
+                  }}
+                  className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${
+                    brushType === 'brush' ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 font-bold' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Brush (Wide artistic stroke)"
+                >
+                  <Palette className="w-3.5 h-3.5" />
+                  <span>Brush</span>
+                </button>
+              </div>
+
+              {/* Stroke Width Slider */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Width:</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="50"
+                  value={penWidth}
+                  onChange={(e) => setPenWidth(Number(e.target.value))}
+                  className="w-18 accent-violet-600 cursor-pointer"
                 />
-              ))}
+                <span className="font-mono font-bold text-[11px] w-7 text-center">{penWidth}px</span>
+              </div>
+
+              {/* Opacity Slider */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Opacity:</span>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  value={Math.round(penOpacity * 100)}
+                  onChange={(e) => setPenOpacity(Number(e.target.value) / 100)}
+                  className="w-16 accent-violet-600 cursor-pointer"
+                />
+                <span className="font-mono font-bold text-[11px] w-8 text-center">{Math.round(penOpacity * 100)}%</span>
+              </div>
+
+              {/* Custom Color Picker & Presets */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div
+                  className="w-4 h-4 rounded-full border border-slate-400 shadow-2xs"
+                  style={{ backgroundColor: penColor }}
+                />
+                <input
+                  type="color"
+                  value={penColor}
+                  onChange={(e) => setPenColor(e.target.value)}
+                  className="w-4 h-4 rounded cursor-pointer border-0 p-0"
+                  title="Choose Custom Pen Color"
+                />
+                <div className="flex items-center gap-1 ml-0.5">
+                  {['#000000', '#334155', '#2563eb', '#dc2626', '#059669', '#7c3aed'].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setPenColor(c)}
+                      className={`w-3.5 h-3.5 rounded-full border transition-transform ${
+                        penColor.toLowerCase() === c.toLowerCase() ? 'scale-125 border-violet-600 ring-1 ring-violet-500' : 'border-slate-300'
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* FONT FAMILY DROPDOWN */}
-          <div className="flex items-center gap-1">
-            <select
-              value={fontFamily}
-              onChange={(e) => {
-                setFontFamily(e.target.value);
-                updateSelectedText({ fontFamily: e.target.value });
-              }}
-              className="bg-white dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 font-semibold text-xs text-slate-800 dark:text-slate-200"
-            >
-              {FONT_FAMILIES.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* B. ERASER SUITE */}
+          {activeTool === 'eraser' && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setEraserMode('precision')}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    eraserMode === 'precision'
+                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold border border-rose-300'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Precision Eraser (Erases drawn strokes & shapes on collision/contact)"
+                >
+                  <Target className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Precision Eraser</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEraserMode('object')}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    eraserMode === 'object'
+                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold border border-rose-300'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Object Eraser (1-Click deletion of entire strokes, shapes, or annotations)"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Object Eraser</span>
+                </button>
+              </div>
 
-          {/* BOLD / ITALIC / UNDERLINE */}
-          <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5">
-            <button
-              onClick={() => {
-                setIsBold(!isBold);
-                updateSelectedText({ isBold: !isBold });
-              }}
-              className={`px-2 py-0.5 rounded font-black ${isBold ? 'bg-violet-100 text-violet-700' : 'text-slate-600'}`}
-              title="Bold"
-            >
-              B
-            </button>
-            <button
-              onClick={() => {
-                setIsItalic(!isItalic);
-                updateSelectedText({ isItalic: !isItalic });
-              }}
-              className={`px-2 py-0.5 rounded italic font-serif ${isItalic ? 'bg-violet-100 text-violet-700' : 'text-slate-600'}`}
-              title="Italic"
-            >
-              I
-            </button>
-            <button
-              onClick={() => {
-                setIsUnderline(!isUnderline);
-                updateSelectedText({ isUnderline: !isUnderline });
-              }}
-              className={`px-2 py-0.5 rounded underline ${isUnderline ? 'bg-violet-100 text-violet-700' : 'text-slate-600'}`}
-              title="Underline"
-            >
-              U
-            </button>
-          </div>
+              {eraserMode === 'precision' && (
+                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <span className="text-[11px] text-slate-500 font-medium">Eraser Size:</span>
+                  <input
+                    type="range"
+                    min="8"
+                    max="60"
+                    value={eraserRadius}
+                    onChange={(e) => setEraserRadius(Number(e.target.value))}
+                    className="w-20 accent-rose-600 cursor-pointer"
+                  />
+                  <span className="font-mono font-bold text-[11px] text-rose-600 w-8 text-center">{eraserRadius}px</span>
+                </div>
+              )}
 
-          {/* ALIGNMENT */}
-          <div className="hidden md:flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5">
-            <button
-              onClick={() => {
-                setTextAlign('left');
-                updateSelectedText({ textAlign: 'left' });
-              }}
-              className={`p-1 rounded ${textAlign === 'left' ? 'bg-violet-100 text-violet-700' : 'text-slate-500'}`}
-            >
-              <AlignLeft className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                setTextAlign('center');
-                updateSelectedText({ textAlign: 'center' });
-              }}
-              className={`p-1 rounded ${textAlign === 'center' ? 'bg-violet-100 text-violet-700' : 'text-slate-500'}`}
-            >
-              <AlignCenter className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                setTextAlign('right');
-                updateSelectedText({ textAlign: 'right' });
-              }}
-              className={`p-1 rounded ${textAlign === 'right' ? 'bg-violet-100 text-violet-700' : 'text-slate-500'}`}
-            >
-              <AlignRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={handleClearPageDrawings}
+                className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-lg border border-slate-200 dark:border-slate-700 font-semibold flex items-center gap-1 transition-colors"
+                title="Erase all drawings on this page"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Clear Page Drawings</span>
+              </button>
+            </div>
+          )}
+
+          {/* C. ENHANCED LINE & SHAPES SUITE */}
+          {(activeTool === 'line' || (selectedShape && activeTool !== 'addText')) && (
+            <div className="flex items-center gap-2">
+              {/* Line & Shape Type Dropdown */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-slate-500 font-medium text-[11px]">Type:</span>
+                <select
+                  value={selectedShape ? selectedShape.shapeType : lineShapeType}
+                  onChange={(e) => {
+                    const val = e.target.value as LineShapeType;
+                    setLineShapeType(val);
+                    if (selectedShape) updateSelectedShape({ shapeType: val });
+                  }}
+                  className="bg-transparent font-semibold text-xs text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+                >
+                  <option value="line">Solid Line (—)</option>
+                  <option value="dashed-line">Dashed Line (- - -)</option>
+                  <option value="dotted-line">Dotted Line (• • •)</option>
+                  <option value="arrow">Single Arrow (—→)</option>
+                  <option value="double-arrow">Double Arrow (←—→)</option>
+                  <option value="rectangle">Rectangle (□)</option>
+                  <option value="circle">Circle / Ellipse (○)</option>
+                  <option value="triangle">Triangle (△)</option>
+                </select>
+              </div>
+
+              {/* Stroke Color */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Border:</span>
+                <input
+                  type="color"
+                  value={selectedShape?.strokeColor || strokeColor}
+                  onChange={(e) => {
+                    setStrokeColor(e.target.value);
+                    if (selectedShape) updateSelectedShape({ strokeColor: e.target.value });
+                  }}
+                  className="w-4 h-4 rounded cursor-pointer border-0 p-0"
+                />
+              </div>
+
+              {/* Fill Color */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Fill:</span>
+                <input
+                  type="color"
+                  value={
+                    (selectedShape?.fillColor || shapeFillColor) === 'transparent'
+                      ? '#ffffff'
+                      : selectedShape?.fillColor || shapeFillColor
+                  }
+                  onChange={(e) => {
+                    setShapeFillColor(e.target.value);
+                    if (selectedShape) updateSelectedShape({ fillColor: e.target.value });
+                  }}
+                  className="w-4 h-4 rounded cursor-pointer border-0 p-0"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShapeFillColor('transparent');
+                    if (selectedShape) updateSelectedShape({ fillColor: 'transparent' });
+                  }}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    (selectedShape?.fillColor || shapeFillColor) === 'transparent'
+                      ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white'
+                      : 'text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  Clear
+                </button>
+              </div>
+
+              {/* Stroke Width Slider */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Thickness:</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="30"
+                  value={selectedShape?.strokeWidth || strokeWidth}
+                  onChange={(e) => {
+                    const w = Number(e.target.value);
+                    setStrokeWidth(w);
+                    if (selectedShape) updateSelectedShape({ strokeWidth: w });
+                  }}
+                  className="w-16 accent-violet-600 cursor-pointer"
+                />
+                <span className="font-mono font-bold text-[11px] w-6 text-center">
+                  {selectedShape?.strokeWidth || strokeWidth}px
+                </span>
+              </div>
+
+              {/* Opacity Slider */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Opacity:</span>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  value={Math.round((selectedShape?.opacity ?? shapeOpacity) * 100)}
+                  onChange={(e) => {
+                    const op = Number(e.target.value) / 100;
+                    setShapeOpacity(op);
+                    if (selectedShape) updateSelectedShape({ opacity: op });
+                  }}
+                  className="w-16 accent-violet-600 cursor-pointer"
+                />
+                <span className="font-mono font-bold text-[11px] w-7 text-center">
+                  {Math.round((selectedShape?.opacity ?? shapeOpacity) * 100)}%
+                </span>
+              </div>
+
+              {/* Dimension Callout Toggle */}
+              <label className="flex items-center gap-1.5 cursor-pointer bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <input
+                  type="checkbox"
+                  checked={selectedShape?.showDimensions ?? showDimensions}
+                  onChange={(e) => {
+                    setShowDimensions(e.target.checked);
+                    if (selectedShape) updateSelectedShape({ showDimensions: e.target.checked });
+                  }}
+                  className="rounded text-violet-600 accent-violet-600 w-3.5 h-3.5"
+                />
+                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">W×H Callout</span>
+              </label>
+            </div>
+          )}
+
+          {/* D. FREEHAND TEXT HIGHLIGHTER SUITE */}
+          {activeTool === 'highlight' && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setHighlighterMode('freehand')}
+                  className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${
+                    highlighterMode === 'freehand'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Freehand Highlighter Brush (Drag smoothly over text)"
+                >
+                  <Highlighter className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Freehand Brush</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHighlighterMode('box')}
+                  className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${
+                    highlighterMode === 'box'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Box Highlight Area (Click to place highlight rectangle)"
+                >
+                  <SquareIcon className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Box Area</span>
+                </button>
+              </div>
+
+              {/* 5 Quick Highlighter Colors */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Color:</span>
+                {[
+                  { name: 'Yellow', hex: '#fef08a' },
+                  { name: 'Green', hex: '#bbf7d0' },
+                  { name: 'Pink', hex: '#fbcfe8' },
+                  { name: 'Blue', hex: '#bfdbfe' },
+                  { name: 'Cyan', hex: '#a5f3fc' },
+                ].map((c) => (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    onClick={() => setHighlighterColor(c.hex)}
+                    className={`w-4 h-4 rounded-full border shadow-2xs transition-transform ${
+                      highlighterColor.toLowerCase() === c.hex.toLowerCase()
+                        ? 'scale-125 border-amber-600 ring-2 ring-amber-400'
+                        : 'border-slate-300 hover:scale-110'
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                    title={c.name}
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={highlighterColor}
+                  onChange={(e) => setHighlighterColor(e.target.value)}
+                  className="w-4 h-4 rounded cursor-pointer border-0 p-0 ml-1"
+                  title="Custom Color"
+                />
+              </div>
+
+              {/* Highlighter Width */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Brush:</span>
+                <input
+                  type="range"
+                  min="12"
+                  max="60"
+                  value={highlighterWidth}
+                  onChange={(e) => setHighlighterWidth(Number(e.target.value))}
+                  className="w-16 accent-amber-500 cursor-pointer"
+                />
+                <span className="font-mono font-bold text-[11px] w-6 text-center">{highlighterWidth}px</span>
+              </div>
+
+              {/* Opacity */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Opacity:</span>
+                <input
+                  type="range"
+                  min="15"
+                  max="80"
+                  value={Math.round(highlighterOpacity * 100)}
+                  onChange={(e) => setHighlighterOpacity(Number(e.target.value) / 100)}
+                  className="w-16 accent-amber-500 cursor-pointer"
+                />
+                <span className="font-mono font-bold text-[11px] w-7 text-center">
+                  {Math.round(highlighterOpacity * 100)}%
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* E. ADVANCED STAMP & CUSTOM IMAGE STAMPS */}
+          {(activeTool === 'stamp' || (selectedStamp && activeTool !== 'addText')) && (
+            <div className="flex items-center gap-2">
+              {/* Preset Selector */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Preset:</span>
+                <select
+                  value={selectedStamp ? selectedStamp.stampType : stampPreset}
+                  onChange={(e) => {
+                    const preset = e.target.value as StampPresetType;
+                    setStampPreset(preset);
+                    if (preset !== 'CUSTOM') {
+                      setCustomStampText(preset);
+                    }
+                    if (selectedStamp) {
+                      updateSelectedStamp({ stampType: preset, customText: preset !== 'CUSTOM' ? preset : selectedStamp.customText });
+                    }
+                  }}
+                  className="bg-transparent font-black text-xs text-slate-900 dark:text-white uppercase focus:outline-none cursor-pointer"
+                >
+                  <option value="APPROVED">APPROVED</option>
+                  <option value="REJECTED">REJECTED</option>
+                  <option value="CONFIDENTIAL">CONFIDENTIAL</option>
+                  <option value="DRAFT">DRAFT</option>
+                  <option value="VERIFIED">VERIFIED</option>
+                  <option value="FINAL">FINAL</option>
+                  <option value="PAID">PAID</option>
+                  <option value="OFFICIAL">OFFICIAL</option>
+                  <option value="CUSTOM">CUSTOM TEXT</option>
+                </select>
+              </div>
+
+              {/* Custom Text Input */}
+              <input
+                type="text"
+                value={selectedStamp?.customText ?? customStampText}
+                onChange={(e) => {
+                  setCustomStampText(e.target.value);
+                  if (selectedStamp) updateSelectedStamp({ customText: e.target.value });
+                }}
+                placeholder="Custom stamp text..."
+                className="w-28 px-2 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 font-bold uppercase text-[11px]"
+              />
+
+              {/* Color Themes */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                {[
+                  { name: 'Red', hex: '#dc2626' },
+                  { name: 'Green', hex: '#059669' },
+                  { name: 'Blue', hex: '#2563eb' },
+                  { name: 'Gold', hex: '#d97706' },
+                  { name: 'Purple', hex: '#7c3aed' },
+                  { name: 'Charcoal', hex: '#334155' },
+                ].map((c) => (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    onClick={() => {
+                      setStampColor(c.hex);
+                      if (selectedStamp) updateSelectedStamp({ color: c.hex });
+                    }}
+                    className={`w-3.5 h-3.5 rounded-full border shadow-2xs transition-transform ${
+                      (selectedStamp?.color || stampColor).toLowerCase() === c.hex.toLowerCase()
+                        ? 'scale-125 border-slate-900 ring-2 ring-slate-400'
+                        : 'border-slate-300'
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                    title={c.name}
+                  />
+                ))}
+              </div>
+
+              {/* Border Style */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Border:</span>
+                <select
+                  value={selectedStamp?.borderStyle || stampBorderStyle}
+                  onChange={(e) => {
+                    const b = e.target.value as any;
+                    setStampBorderStyle(b);
+                    if (selectedStamp) updateSelectedStamp({ borderStyle: b });
+                  }}
+                  className="bg-transparent font-semibold text-xs text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+                >
+                  <option value="double">Double Border (Classic)</option>
+                  <option value="solid">Solid Modern</option>
+                  <option value="dashed">Dashed Seal</option>
+                  <option value="seal">Star Seal Badge (★)</option>
+                </select>
+              </div>
+
+              {/* Date Option */}
+              <label className="flex items-center gap-1 cursor-pointer bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <input
+                  type="checkbox"
+                  checked={selectedStamp?.showDate ?? stampShowDate}
+                  onChange={(e) => {
+                    setStampShowDate(e.target.checked);
+                    if (selectedStamp) updateSelectedStamp({ showDate: e.target.checked });
+                  }}
+                  className="rounded text-violet-600 accent-violet-600 w-3.5 h-3.5"
+                />
+                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Date</span>
+              </label>
+
+              {/* Rotation Slider */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] text-slate-500 font-medium">Angle:</span>
+                <input
+                  type="range"
+                  min="-45"
+                  max="45"
+                  value={selectedStamp?.rotation ?? stampRotation}
+                  onChange={(e) => {
+                    const r = Number(e.target.value);
+                    setStampRotation(r);
+                    if (selectedStamp) updateSelectedStamp({ rotation: r });
+                  }}
+                  className="w-16 accent-violet-600 cursor-pointer"
+                />
+                <span className="font-mono font-bold text-[11px] w-7 text-center">
+                  {selectedStamp?.rotation ?? stampRotation}°
+                </span>
+              </div>
+
+              {/* Upload Custom Stamp File Button */}
+              <button
+                type="button"
+                onClick={() => stampFileInputRef.current?.click()}
+                className="px-2.5 py-1 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-2xs transition-colors"
+                title="Upload PNG / SVG / WEBP / JPG Custom Stamp"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload Stamp</span>
+              </button>
+              <input
+                ref={stampFileInputRef}
+                type="file"
+                accept="image/png,image/svg+xml,image/webp,image/jpeg"
+                className="hidden"
+                onChange={handleCustomStampUpload}
+              />
+            </div>
+          )}
+
+          {/* F. TEXT FORMATTING SUITE (Default when text selected or text tools active) */}
+          {(activeTool === 'addText' || activeTool === 'editText' || activeTool === 'select' || activeTool === 'sign' || activeTool === 'link' || activeTool === 'note') && (
+            <div className="flex items-center gap-3">
+              {/* Font Size Controls */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-slate-500 font-bold text-xs">T</span>
+                <button
+                  type="button"
+                  onClick={() => updateSelectedText({ fontSize: Math.max(8, fontSize - 1) })}
+                  className="px-1 hover:text-violet-600 font-black"
+                >
+                  -
+                </button>
+                <span className="font-bold min-w-[20px] text-center">{fontSize}</span>
+                <button
+                  type="button"
+                  onClick={() => updateSelectedText({ fontSize: Math.min(72, fontSize + 1) })}
+                  className="px-1 hover:text-violet-600 font-black"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Background Color */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <SquareIcon className="w-3.5 h-3.5 text-slate-500" />
+                <input
+                  type="color"
+                  value={bgColor === 'transparent' ? '#ffffff' : bgColor}
+                  onChange={(e) => {
+                    setBgColor(e.target.value);
+                    updateSelectedText({ backgroundColor: e.target.value });
+                  }}
+                  className="w-4 h-4 rounded cursor-pointer border-0 p-0"
+                  title="Box Background / Highlight Color"
+                />
+              </div>
+
+              {/* Text Color Picker */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div
+                  className="w-4 h-4 rounded-full border border-slate-400 cursor-pointer shadow-xs"
+                  style={{ backgroundColor: textColor }}
+                  title="Current Text Color"
+                />
+                <input
+                  type="color"
+                  value={textColor}
+                  onChange={(e) => {
+                    setTextColor(e.target.value);
+                    updateSelectedText({ color: e.target.value });
+                  }}
+                  className="w-4 h-4 rounded cursor-pointer border-0 p-0"
+                  title="Choose Custom Color"
+                />
+                <div className="flex items-center gap-1 ml-1">
+                  {PRESET_COLORS.slice(0, 4).map((c) => (
+                    <button
+                      key={c.hex}
+                      type="button"
+                      onClick={() => {
+                        setTextColor(c.hex);
+                        updateSelectedText({ color: c.hex });
+                      }}
+                      className="w-3 h-3 rounded-full border border-slate-300"
+                      style={{ backgroundColor: c.hex }}
+                      title={c.name}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Font Family Dropdown */}
+              <div className="flex items-center gap-1">
+                <select
+                  value={fontFamily}
+                  onChange={(e) => {
+                    setFontFamily(e.target.value);
+                    updateSelectedText({ fontFamily: e.target.value });
+                  }}
+                  className="bg-white dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 font-semibold text-xs text-slate-800 dark:text-slate-200"
+                >
+                  {FONT_FAMILIES.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Bold / Italic / Underline */}
+              <div className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBold(!isBold);
+                    updateSelectedText({ isBold: !isBold });
+                  }}
+                  className={`px-2 py-0.5 rounded font-black ${isBold ? 'bg-violet-100 text-violet-700' : 'text-slate-600'}`}
+                  title="Bold"
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsItalic(!isItalic);
+                    updateSelectedText({ isItalic: !isItalic });
+                  }}
+                  className={`px-2 py-0.5 rounded italic font-serif ${isItalic ? 'bg-violet-100 text-violet-700' : 'text-slate-600'}`}
+                  title="Italic"
+                >
+                  I
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUnderline(!isUnderline);
+                    updateSelectedText({ isUnderline: !isUnderline });
+                  }}
+                  className={`px-2 py-0.5 rounded underline ${isUnderline ? 'bg-violet-100 text-violet-700' : 'text-slate-600'}`}
+                  title="Underline"
+                >
+                  U
+                </button>
+              </div>
+
+              {/* Alignment */}
+              <div className="hidden md:flex items-center bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTextAlign('left');
+                    updateSelectedText({ textAlign: 'left' });
+                  }}
+                  className={`p-1 rounded ${textAlign === 'left' ? 'bg-violet-100 text-violet-700' : 'text-slate-500'}`}
+                >
+                  <AlignLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTextAlign('center');
+                    updateSelectedText({ textAlign: 'center' });
+                  }}
+                  className={`p-1 rounded ${textAlign === 'center' ? 'bg-violet-100 text-violet-700' : 'text-slate-500'}`}
+                >
+                  <AlignCenter className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTextAlign('right');
+                    updateSelectedText({ textAlign: 'right' });
+                  }}
+                  className={`p-1 rounded ${textAlign === 'right' ? 'bg-violet-100 text-violet-700' : 'text-slate-500'}`}
+                >
+                  <AlignRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* FAR RIGHT: TRASH CAN DELETE BUTTON (MATCHING SCREENSHOT) */}
-        <div>
+        {/* Far Right: Selected Element Actions (Duplicate, Delete, Deselect) */}
+        <div className="flex items-center gap-1 shrink-0">
+          {selectedElementId && (
+            <>
+              <button
+                type="button"
+                onClick={duplicateSelectedElement}
+                className="p-1.5 text-slate-500 hover:text-violet-600 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                title="Duplicate Selected Element"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedElementId(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                title="Deselect"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </>
+          )}
+
           <button
+            type="button"
             onClick={deleteSelectedElement}
             disabled={!selectedElementId}
             className="p-1.5 text-slate-400 hover:text-rose-600 disabled:opacity-30 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
-            title="Delete Selected Element"
+            title="Delete Selected Element (Del)"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -2831,161 +4927,445 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
                 {/* 1. Underlying PDF Render Canvas */}
                 <canvas ref={canvasRef} className="block pointer-events-none" />
 
-                {/* 2. Freehand Drawing Canvas Overlay */}
-                <canvas
-                  ref={drawCanvasRef}
+                {/* 2. Freehand Drawing & Natural Highlighter Vector SVG Layer */}
+                <svg
+                  className="absolute inset-0 w-full h-full pointer-events-none z-15"
+                  viewBox={`0 0 ${pageDimensions.width || 800} ${pageDimensions.height || 1000}`}
+                  preserveAspectRatio="none"
+                >
+                  <defs>
+                    <filter id="pencilTexture" x="0%" y="0%" width="100%" height="100%">
+                      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" result="noise" />
+                      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.5" />
+                    </filter>
+                  </defs>
+
+                  {/* Saved Freehand Strokes on Current Page */}
+                  {drawStrokes
+                    .filter((st) => st.pageIndex === currentPage - 1)
+                    .map((st) => {
+                      const pw = pageDimensions.width || 800;
+                      const ph = pageDimensions.height || 1000;
+                      const d = st.points
+                        .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * pw} ${p.y * ph}`)
+                        .join(' ');
+                      const isEraserObject = activeTool === 'eraser' && eraserMode === 'object';
+                      return (
+                        <path
+                          key={st.id}
+                          d={d}
+                          fill="none"
+                          stroke={st.color}
+                          strokeWidth={st.strokeWidth}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeOpacity={st.opacity ?? 1}
+                          filter={st.brushType === 'pencil' ? 'url(#pencilTexture)' : undefined}
+                          style={{
+                            pointerEvents: isEraserObject ? 'stroke' : 'none',
+                            cursor: isEraserObject ? 'crosshair' : 'default',
+                            mixBlendMode: st.isHighlighter ? 'multiply' : 'normal',
+                          }}
+                          className={isEraserObject ? 'hover:stroke-rose-600 transition-colors' : ''}
+                          onClick={
+                            isEraserObject
+                              ? (e) => {
+                                  e.stopPropagation();
+                                  deleteStroke(st.id);
+                                }
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
+
+                  {/* Active In-Progress Stroke */}
+                  {currentStroke.length > 0 && (
+                    <path
+                      d={currentStroke
+                        .map(
+                          (p, i) =>
+                            `${i === 0 ? 'M' : 'L'} ${p.x * (pageDimensions.width || 800)} ${p.y * (pageDimensions.height || 1000)}`
+                        )
+                        .join(' ')}
+                      fill="none"
+                      stroke={activeTool === 'highlight' ? highlighterColor : penColor}
+                      strokeWidth={activeTool === 'highlight' ? highlighterWidth : penWidth}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeOpacity={activeTool === 'highlight' ? highlighterOpacity : penOpacity}
+                      filter={activeTool === 'draw' && brushType === 'pencil' ? 'url(#pencilTexture)' : undefined}
+                      style={{
+                        mixBlendMode: activeTool === 'highlight' ? 'multiply' : 'normal',
+                      }}
+                    />
+                  )}
+                </svg>
+
+                {/* Hidden canvas ref to preserve canvas hooks if needed */}
+                <canvas ref={drawCanvasRef} className="hidden" />
+
+                {/* Interactive Surface for Drawing, Highlighting, and Precision Erasing */}
+                <div
                   onMouseDown={handleMouseDownDraw}
                   onMouseMove={handleMouseMoveDraw}
                   onMouseUp={handleMouseUpDraw}
-                  className={`absolute inset-0 ${activeTool === 'draw' ? 'cursor-crosshair pointer-events-auto' : 'pointer-events-none'}`}
+                  onMouseLeave={() => {
+                    if (isDrawing) handleMouseUpDraw();
+                    setEraserCursorPos(null);
+                  }}
+                  className={`absolute inset-0 z-20 ${
+                    activeTool === 'draw'
+                      ? 'cursor-crosshair pointer-events-auto'
+                      : activeTool === 'highlight' && highlighterMode === 'freehand'
+                      ? 'cursor-crosshair pointer-events-auto'
+                      : activeTool === 'eraser'
+                      ? eraserMode === 'precision'
+                        ? 'cursor-none pointer-events-auto'
+                        : 'cursor-crosshair pointer-events-auto'
+                      : 'pointer-events-none'
+                  }`}
                 />
+
+                {/* Precision Eraser Target Ring Cursor Follower */}
+                {activeTool === 'eraser' && eraserMode === 'precision' && eraserCursorPos && (
+                  <div
+                    className="absolute pointer-events-none rounded-full border-2 border-rose-500 bg-rose-500/20 z-50 transform -translate-x-1/2 -translate-y-1/2 shadow-sm pointer-events-none"
+                    style={{
+                      left: eraserCursorPos.x,
+                      top: eraserCursorPos.y,
+                      width: eraserRadius * 2,
+                      height: eraserRadius * 2,
+                    }}
+                  />
+                )}
 
                 {/* 3. Whiteouts Layer */}
                 {whiteouts
                   .filter((wh) => wh.pageIndex === currentPage - 1)
-                  .map((wh) => (
-                    <div
-                      key={wh.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedElementId(wh.id);
-                      }}
-                      onMouseDown={(e) => startDragging(e, wh.id, 'whiteout', wh.x, wh.y)}
-                      className={`absolute bg-white border border-slate-200 cursor-grab active:cursor-grabbing ${
-                        selectedElementId === wh.id ? 'ring-2 ring-violet-500 shadow-md' : 'hover:border-slate-400'
-                      }`}
-                      style={{
-                        left: `${wh.x * 100}%`,
-                        top: `${wh.y * 100}%`,
-                        width: `${wh.width * 100}%`,
-                        height: `${wh.height * 100}%`,
-                      }}
-                      title="Click to select, drag to move whiteout"
-                    />
-                  ))}
+                  .map((wh) => {
+                    const isSelected = selectedElementId === wh.id;
+                    const isEraserObject = activeTool === 'eraser' && eraserMode === 'object';
+                    return (
+                      <div
+                        key={wh.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isEraserObject) {
+                            deleteElement(wh.id, 'whiteout');
+                            return;
+                          }
+                          setSelectedElementId(wh.id);
+                        }}
+                        onMouseDown={(e) => {
+                          if (isEraserObject) return;
+                          startDragging(e, wh.id, 'whiteout', wh.x, wh.y);
+                        }}
+                        className={`absolute bg-white border border-slate-200 cursor-grab active:cursor-grabbing ${
+                          isSelected ? 'ring-2 ring-violet-500 shadow-md z-30' : 'hover:border-slate-400 z-10'
+                        } ${isEraserObject ? 'hover:ring-2 hover:ring-rose-500 hover:bg-rose-100 cursor-pointer' : ''}`}
+                        style={{
+                          left: `${wh.x * 100}%`,
+                          top: `${wh.y * 100}%`,
+                          width: `${wh.width * 100}%`,
+                          height: `${wh.height * 100}%`,
+                        }}
+                        title={isEraserObject ? 'Click to erase whiteout' : 'Click to select, drag to move whiteout'}
+                      >
+                        {renderTransformHandles(wh.id, 'whiteout', wh.x, wh.y, wh.width, wh.height)}
+                      </div>
+                    );
+                  })}
 
                 {/* 4. Shapes & Lines Layer */}
                 {shapeBlocks
                   .filter((sh) => sh.pageIndex === currentPage - 1)
-                  .map((sh) => (
-                    <div
-                      key={sh.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedElementId(sh.id);
-                      }}
-                      onMouseDown={(e) => startDragging(e, sh.id, 'shape', sh.x, sh.y)}
-                      className={`absolute cursor-grab active:cursor-grabbing select-none transition-shadow ${
-                        selectedElementId === sh.id ? 'ring-2 ring-violet-500 rounded p-0.5 shadow-lg' : 'hover:ring-1 hover:ring-violet-400'
-                      }`}
-                      style={{
-                        left: `${sh.x * 100}%`,
-                        top: `${sh.y * 100}%`,
-                        width: `${sh.width * 100}%`,
-                        height: `${sh.height * 100}%`,
-                        opacity: sh.opacity,
-                      }}
-                      title="Click to select, drag to move shape"
-                    >
-                      {sh.shapeType === 'rectangle' && (
-                        <div
-                          className="w-full h-full"
-                          style={{
-                            border: `${sh.strokeWidth}px solid ${sh.strokeColor}`,
-                            backgroundColor: sh.fillColor,
-                          }}
-                        />
-                      )}
-                      {sh.shapeType === 'circle' && (
-                        <div
-                          className="w-full h-full rounded-full"
-                          style={{
-                            border: `${sh.strokeWidth}px solid ${sh.strokeColor}`,
-                            backgroundColor: sh.fillColor,
-                          }}
-                        />
-                      )}
-                      {(sh.shapeType === 'line' || sh.shapeType === 'arrow') && (
-                        <div
-                          className="w-full h-0 my-auto border-t"
-                          style={{
-                            borderTop: `${sh.strokeWidth}px solid ${sh.strokeColor}`,
-                          }}
-                        />
-                      )}
-                      {sh.shapeType === 'highlight' && (
-                        <div
-                          className="w-full h-full"
-                          style={{
-                            backgroundColor: sh.strokeColor || '#fef08a',
-                            opacity: 0.5,
-                          }}
-                        />
-                      )}
-                    </div>
-                  ))}
+                  .map((sh) => {
+                    const isSelected = selectedElementId === sh.id;
+                    const isEraserObject = activeTool === 'eraser' && eraserMode === 'object';
+                    const pw = pageDimensions.width || 800;
+                    const ph = pageDimensions.height || 1000;
+                    const pixelW = Math.round(sh.width * pw);
+                    const pixelH = Math.round(sh.height * ph);
 
-                {/* 5. Stamps Layer */}
+                    return (
+                      <div
+                        key={sh.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isEraserObject) {
+                            deleteElement(sh.id, 'shape');
+                            return;
+                          }
+                          setSelectedElementId(sh.id);
+                        }}
+                        onMouseDown={(e) => {
+                          if (isEraserObject) return;
+                          startDragging(e, sh.id, 'shape', sh.x, sh.y);
+                        }}
+                        className={`absolute cursor-grab active:cursor-grabbing select-none transition-shadow ${
+                          isSelected ? 'ring-2 ring-violet-500 rounded p-0.5 shadow-lg z-30' : 'hover:ring-1 hover:ring-violet-400 z-10'
+                        } ${isEraserObject ? 'hover:ring-2 hover:ring-rose-500 hover:bg-rose-500/10 cursor-pointer' : ''}`}
+                        style={{
+                          left: `${sh.x * 100}%`,
+                          top: `${sh.y * 100}%`,
+                          width: `${sh.width * 100}%`,
+                          height: `${sh.height * 100}%`,
+                          opacity: sh.opacity,
+                          transform: sh.rotation ? `rotate(${sh.rotation}deg)` : undefined,
+                          transformOrigin: 'center center',
+                        }}
+                        title={isEraserObject ? 'Click to erase shape' : 'Click to select, drag to move shape'}
+                      >
+                        {/* A. Rectangle */}
+                        {sh.shapeType === 'rectangle' && (
+                          <div
+                            className="w-full h-full rounded-xs"
+                            style={{
+                              border: `${sh.strokeWidth}px solid ${sh.strokeColor}`,
+                              backgroundColor: sh.fillColor && sh.fillColor !== 'transparent' ? sh.fillColor : 'transparent',
+                            }}
+                          />
+                        )}
+
+                        {/* B. Circle / Ellipse */}
+                        {sh.shapeType === 'circle' && (
+                          <div
+                            className="w-full h-full rounded-full"
+                            style={{
+                              border: `${sh.strokeWidth}px solid ${sh.strokeColor}`,
+                              backgroundColor: sh.fillColor && sh.fillColor !== 'transparent' ? sh.fillColor : 'transparent',
+                            }}
+                          />
+                        )}
+
+                        {/* C. Triangle */}
+                        {sh.shapeType === 'triangle' && (
+                          <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                            <polygon
+                              points="50,2 98,98 2,98"
+                              stroke={sh.strokeColor}
+                              strokeWidth={Math.max(2, sh.strokeWidth * (100 / Math.max(pixelW, 1)))}
+                              fill={sh.fillColor && sh.fillColor !== 'transparent' ? sh.fillColor : 'none'}
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+
+                        {/* D. Lines & Arrows (Solid, Dashed, Dotted, Single Arrow, Double Arrow) */}
+                        {(sh.shapeType === 'line' ||
+                          sh.shapeType === 'dashed-line' ||
+                          sh.shapeType === 'dotted-line' ||
+                          sh.shapeType === 'arrow' ||
+                          sh.shapeType === 'double-arrow') && (
+                          <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                            <defs>
+                              <marker
+                                id={`arrow-end-${sh.id}`}
+                                viewBox="0 0 10 10"
+                                refX="6"
+                                refY="5"
+                                markerWidth="6"
+                                markerHeight="6"
+                                orient="auto-start-reverse"
+                              >
+                                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill={sh.strokeColor} />
+                              </marker>
+                              <marker
+                                id={`arrow-start-${sh.id}`}
+                                viewBox="0 0 10 10"
+                                refX="2"
+                                refY="5"
+                                markerWidth="6"
+                                markerHeight="6"
+                                orient="auto-start-reverse"
+                              >
+                                <path d="M 8 1.5 L 0 5 L 8 8.5 z" fill={sh.strokeColor} />
+                              </marker>
+                            </defs>
+                            <line
+                              x1="2"
+                              y1="50"
+                              x2="98"
+                              y2="50"
+                              stroke={sh.strokeColor}
+                              strokeWidth={Math.max(1, sh.strokeWidth * (100 / Math.max(pixelH, 20)))}
+                              strokeDasharray={
+                                sh.shapeType === 'dashed-line' ? '8, 6' : sh.shapeType === 'dotted-line' ? '2, 6' : undefined
+                              }
+                              markerEnd={
+                                sh.shapeType === 'arrow' || sh.shapeType === 'double-arrow'
+                                  ? `url(#arrow-end-${sh.id})`
+                                  : undefined
+                              }
+                              markerStart={sh.shapeType === 'double-arrow' ? `url(#arrow-start-${sh.id})` : undefined}
+                            />
+                          </svg>
+                        )}
+
+                        {/* E. Highlight Box */}
+                        {sh.shapeType === 'highlight' && (
+                          <div
+                            className="w-full h-full rounded-xs"
+                            style={{
+                              backgroundColor: sh.strokeColor || '#fef08a',
+                              opacity: sh.opacity || 0.45,
+                            }}
+                          />
+                        )}
+
+                        {/* Dynamic Dimension Callout Label */}
+                        {(sh.showDimensions || isSelected) && (
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow pointer-events-none whitespace-nowrap z-40">
+                            {pixelW} × {pixelH} px
+                          </div>
+                        )}
+
+                        {/* 8-Point Universal Transform Handles */}
+                        {renderTransformHandles(sh.id, 'shape', sh.x, sh.y, sh.width, sh.height, sh.rotation)}
+                      </div>
+                    );
+                  })}
+
+                {/* 5. Stamps Layer (Built-in Presets & Custom User Uploaded Stamps) */}
                 {stampBlocks
                   .filter((st) => st.pageIndex === currentPage - 1)
-                  .map((st) => (
-                    <div
-                      key={st.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedElementId(st.id);
-                      }}
-                      onMouseDown={(e) => startDragging(e, st.id, 'stamp', st.x, st.y)}
-                      className={`absolute cursor-grab active:cursor-grabbing select-none transition-shadow ${
-                        selectedElementId === st.id ? 'ring-2 ring-violet-500 rounded shadow-xl' : 'hover:ring-1 hover:ring-violet-400'
-                      }`}
-                      style={{
-                        left: `${st.x * 100}%`,
-                        top: `${st.y * 100}%`,
-                        width: `${st.width * 100}%`,
-                        height: `${st.height * 100}%`,
-                        transform: `rotate(${st.rotation || -6}deg)`,
-                      }}
-                      title="Click to select, drag to move stamp"
-                    >
+                  .map((st) => {
+                    const isSelected = selectedElementId === st.id;
+                    const isEraserObject = activeTool === 'eraser' && eraserMode === 'object';
+                    const stampText = st.stampType === 'CUSTOM' ? st.customText || 'APPROVED' : st.stampType;
+                    const displayDate =
+                      st.dateText ||
+                      new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                    return (
                       <div
-                        className="w-full h-full flex items-center justify-center font-black uppercase tracking-widest text-xs rounded-md border-2 px-2 shadow-xs"
-                        style={{
-                          borderColor: st.color,
-                          color: st.color,
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        key={st.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isEraserObject) {
+                            deleteElement(st.id, 'stamp');
+                            return;
+                          }
+                          setSelectedElementId(st.id);
                         }}
+                        onMouseDown={(e) => {
+                          if (isEraserObject) return;
+                          startDragging(e, st.id, 'stamp', st.x, st.y);
+                        }}
+                        className={`absolute cursor-grab active:cursor-grabbing select-none transition-shadow ${
+                          isSelected ? 'ring-2 ring-violet-500 rounded shadow-xl z-30' : 'hover:ring-1 hover:ring-violet-400 z-10'
+                        } ${isEraserObject ? 'hover:ring-2 hover:ring-rose-500 hover:bg-rose-500/10 cursor-pointer' : ''}`}
+                        style={{
+                          left: `${st.x * 100}%`,
+                          top: `${st.y * 100}%`,
+                          width: `${st.width * 100}%`,
+                          height: `${st.height * 100}%`,
+                          transform: `rotate(${st.rotation || 0}deg)`,
+                        }}
+                        title={isEraserObject ? 'Click to erase stamp' : 'Click to select, drag to move stamp'}
                       >
-                        {st.stampType === 'CUSTOM' ? st.customText || 'APPROVED' : st.stampType}
+                        {st.imageUrl ? (
+                          // Custom User Uploaded Stamp File
+                          <img
+                            src={st.imageUrl}
+                            alt={stampText}
+                            className="w-full h-full object-contain pointer-events-none drop-shadow-md"
+                          />
+                        ) : (
+                          // Built-In Preset / Styled Dynamic Vector Stamp Seal
+                          <div
+                            className={`w-full h-full flex flex-col items-center justify-center font-black uppercase tracking-wider text-center p-1 relative shadow-xs ${
+                              st.borderStyle === 'double'
+                                ? 'border-4 rounded-lg'
+                                : st.borderStyle === 'dashed'
+                                ? 'border-2 border-dashed rounded-lg'
+                                : st.borderStyle === 'seal'
+                                ? 'border-4 rounded-full ring-2 ring-offset-1'
+                                : 'border-2 rounded-md'
+                            }`}
+                            style={{
+                              borderColor: st.color,
+                              color: st.color,
+                              backgroundColor: 'rgba(255, 255, 255, 0.94)',
+                            }}
+                          >
+                            {/* Inner Border for Classic Double Border */}
+                            {st.borderStyle === 'double' && (
+                              <div
+                                className="absolute inset-1 border rounded pointer-events-none"
+                                style={{ borderColor: st.color }}
+                              />
+                            )}
+
+                            {/* Seal Star Icon */}
+                            {st.borderStyle === 'seal' && (
+                              <div className="flex items-center gap-1 text-[10px] leading-none mb-0.5">
+                                <span>★</span>
+                                <span className="text-[8px] font-bold">OFFICIAL</span>
+                                <span>★</span>
+                              </div>
+                            )}
+
+                            <span className="text-xs sm:text-sm font-black tracking-widest leading-tight truncate px-1">
+                              {stampText}
+                            </span>
+
+                            {/* Optional Stamp Date Badge */}
+                            {st.showDate && (
+                              <span className="text-[9px] font-mono font-semibold tracking-normal mt-0.5 opacity-90">
+                                {displayDate}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 8-Point Universal Transform Handles */}
+                        {renderTransformHandles(st.id, 'stamp', st.x, st.y, st.width, st.height, st.rotation)}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                 {/* 6. Images & Signatures Layer */}
                 {imageBlocks
                   .filter((im) => im.pageIndex === currentPage - 1)
-                  .map((im) => (
-                    <div
-                      key={im.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedElementId(im.id);
-                      }}
-                      onMouseDown={(e) => startDragging(e, im.id, 'image', im.x, im.y)}
-                      className={`absolute cursor-grab active:cursor-grabbing select-none transition-shadow ${
-                        selectedElementId === im.id ? 'ring-2 ring-violet-500 rounded p-1 shadow-xl' : 'hover:ring-1 hover:ring-violet-400'
-                      }`}
-                      style={{
-                        left: `${im.x * 100}%`,
-                        top: `${im.y * 100}%`,
-                        width: `${im.width * 100}%`,
-                        height: `${im.height * 100}%`,
-                      }}
-                      title="Click to select, drag to move image"
-                    >
-                      <img src={im.dataUrl} alt="Asset" className="w-full h-full object-contain pointer-events-none" />
-                    </div>
-                  ))}
+                  .map((im) => {
+                    const isSelected = selectedElementId === im.id;
+                    const isEraserObject = activeTool === 'eraser' && eraserMode === 'object';
+                    return (
+                      <div
+                        key={im.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isEraserObject) {
+                            deleteElement(im.id, 'image');
+                            return;
+                          }
+                          setSelectedElementId(im.id);
+                        }}
+                        onMouseDown={(e) => {
+                          if (isEraserObject) return;
+                          startDragging(e, im.id, 'image', im.x, im.y);
+                        }}
+                        className={`absolute cursor-grab active:cursor-grabbing select-none transition-shadow ${
+                          isSelected ? 'ring-2 ring-violet-500 rounded p-1 shadow-xl z-30' : 'hover:ring-1 hover:ring-violet-400 z-10'
+                        } ${isEraserObject ? 'hover:ring-2 hover:ring-rose-500 hover:bg-rose-500/10 cursor-pointer' : ''}`}
+                        style={{
+                          left: `${im.x * 100}%`,
+                          top: `${im.y * 100}%`,
+                          width: `${im.width * 100}%`,
+                          height: `${im.height * 100}%`,
+                          transform: im.rotation ? `rotate(${im.rotation}deg)` : undefined,
+                          transformOrigin: 'center center',
+                        }}
+                        title={isEraserObject ? 'Click to erase image' : 'Click to select, drag to move image'}
+                      >
+                        <img src={im.dataUrl} alt="Asset" className="w-full h-full object-contain pointer-events-none" />
+                        {/* 8-Point Universal Transform Handles */}
+                        {renderTransformHandles(im.id, 'image', im.x, im.y, im.width, im.height, im.rotation)}
+                      </div>
+                    );
+                  })}
 
                 {/* 7. Links Layer */}
                 {linkBlocks
@@ -3125,6 +5505,8 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
                             top: `${tb.y * 100}%`,
                             width: `max(140px, ${(tb.width || 0.1) * 100}%)`,
                             minHeight: `${(tb.height || 0.03) * 100}%`,
+                            transform: tb.rotation ? `rotate(${tb.rotation}deg)` : undefined,
+                            transformOrigin: 'center center',
                           }}
                         >
                           {/* Dedicated Drag & Move Handle on top of active element */}
@@ -3164,28 +5546,43 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
                             }}
                             autoFocus
                           />
+
+                          {/* 8-Point Universal Transform Handles */}
+                          {renderTransformHandles(tb.id, 'text', tb.x, tb.y, tb.width || 0.1, tb.height || 0.03, tb.rotation)}
                         </div>
                       );
                     }
 
                     // Case 3: Modified or User-Added or Moved Text Block
                     if (isModified) {
+                      const isEraserObject = activeTool === 'eraser' && eraserMode === 'object';
                       return (
                         <div
                           key={tb.id}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (isEraserObject) {
+                              deleteElement(tb.id, 'text');
+                              return;
+                            }
                             setSelectedElementId(tb.id);
                           }}
-                          onMouseDown={(e) => startDragging(e, tb.id, 'text', tb.x, tb.y)}
-                          className="absolute z-20 cursor-grab active:cursor-grabbing group select-none"
+                          onMouseDown={(e) => {
+                            if (isEraserObject) return;
+                            startDragging(e, tb.id, 'text', tb.x, tb.y);
+                          }}
+                          className={`absolute z-20 cursor-grab active:cursor-grabbing group select-none ${
+                            isEraserObject ? 'hover:ring-2 hover:ring-rose-500 hover:bg-rose-500/10 cursor-pointer' : ''
+                          }`}
                           style={{
                             left: `${tb.x * 100}%`,
                             top: `${tb.y * 100}%`,
                             width: `${(tb.width || 0.1) * 100}%`,
                             height: `${(tb.height || 0.03) * 100}%`,
+                            transform: tb.rotation ? `rotate(${tb.rotation}deg)` : undefined,
+                            transformOrigin: 'center center',
                           }}
-                          title="Click to select & edit, drag to move text"
+                          title={isEraserObject ? 'Click to erase text' : 'Click to select & edit, drag to move text'}
                         >
                           {/* Whiteout coverage layer for original text underneath if not moved */}
                           {tb.isOriginalParsed && !wasMoved && (
@@ -3214,21 +5611,30 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
 
                     // Case 4: Unmodified Original Text Block (Canvas already shows it crisply!)
                     // Renders an invisible hit box that reveals a clean outline ONLY ON HOVER!
+                    const isEraserObject = activeTool === 'eraser' && eraserMode === 'object';
                     return (
                       <div
                         key={tb.id}
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (isEraserObject) {
+                            deleteElement(tb.id, 'text');
+                            return;
+                          }
                           setSelectedElementId(tb.id);
                         }}
-                        className="absolute z-10 cursor-pointer transition-all border border-transparent hover:border-dashed hover:border-blue-500/80 hover:bg-blue-50/15 rounded-xs"
+                        className={`absolute z-10 cursor-pointer transition-all border border-transparent rounded-xs ${
+                          isEraserObject
+                            ? 'hover:border-rose-500 hover:bg-rose-500/20 hover:border-solid'
+                            : 'hover:border-dashed hover:border-blue-500/80 hover:bg-blue-50/15'
+                        }`}
                         style={{
                           left: `${tb.x * 100}%`,
                           top: `${tb.y * 100}%`,
                           width: `${(tb.width || 0.1) * 100}%`,
                           height: `${(tb.height || 0.03) * 100}%`,
                         }}
-                        title="Click to edit & move this text"
+                        title={isEraserObject ? 'Click to erase original text' : 'Click to edit & move this text'}
                       />
                     );
                   })}
@@ -4420,6 +6826,367 @@ export const UnifiedPdfWorkspace: React.FC<UnifiedPdfWorkspaceProps> = ({
                 className="px-5 py-2 bg-violet-600 text-white rounded-xl text-xs font-bold"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. COMPREHENSIVE EXPORT & SAVING MODAL */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-5 flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                  <Download className="w-5 h-5 text-emerald-600" />
+                  <span>Export & Save Document</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {file?.name || 'document.pdf'} • {pagesList.length} {pagesList.length === 1 ? 'Page' : 'Pages'}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsExportModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Format Selection Grid */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Option 1: Vector PDF */}
+              <button
+                type="button"
+                onClick={() => setExportFormat('vector-pdf')}
+                className={`p-3 rounded-2xl border text-left flex flex-col gap-1 transition-all ${
+                  exportFormat === 'vector-pdf'
+                    ? 'border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/30 ring-2 ring-emerald-500/30'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <FileCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Vector PDF</span>
+                  </span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
+                    Default
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                  Lossless vector output with all edits, stamps, fonts & drawings.
+                </p>
+              </button>
+
+              {/* Option 2: Web-Optimized PDF */}
+              <button
+                type="button"
+                onClick={() => setExportFormat('web-pdf')}
+                className={`p-3 rounded-2xl border text-left flex flex-col gap-1 transition-all ${
+                  exportFormat === 'web-pdf'
+                    ? 'border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/30 ring-2 ring-emerald-500/30'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                    <span>Web-Optimized</span>
+                  </span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
+                    Compressed
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                  Stream-compressed PDF for quick emailing & fast web preview.
+                </p>
+              </button>
+
+              {/* Option 3: Image Conversion */}
+              <button
+                type="button"
+                onClick={() => setExportFormat('image')}
+                className={`p-3 rounded-2xl border text-left flex flex-col gap-1 transition-all ${
+                  exportFormat === 'image'
+                    ? 'border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/30 ring-2 ring-emerald-500/30'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-blue-500" />
+                    <span>Page Image</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">Page {currentPage}</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                  High-res raster capture of canvas page as PNG or JPEG.
+                </p>
+              </button>
+
+              {/* Option 4: Text / OCR */}
+              <button
+                type="button"
+                onClick={() => setExportFormat('text')}
+                className={`p-3 rounded-2xl border text-left flex flex-col gap-1 transition-all ${
+                  exportFormat === 'text'
+                    ? 'border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/30 ring-2 ring-emerald-500/30'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <FileCode className="w-4 h-4 text-purple-500" />
+                    <span>Editable Text</span>
+                  </span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
+                    TXT / JSON
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                  Transcribed plain text or structured layout document data.
+                </p>
+              </button>
+            </div>
+
+            {/* Format Sub-Options / Configuration Area */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+              {exportFormat === 'vector-pdf' && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>High-Fidelity Vector PDF Export</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Saves all pages using the official pdf-lib engine. Preserves vector fidelity of shapes, lines, arrows, freehand drawings, stamps, custom text, and rotated images.
+                  </p>
+                </div>
+              )}
+
+              {exportFormat === 'web-pdf' && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Linearized Web-Optimized PDF</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Enables cross-reference object stream compaction to produce a compact file size ideal for email attachments and rapid browser rendering.
+                  </p>
+                </div>
+              )}
+
+              {exportFormat === 'image' && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Image Format:</span>
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-700 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600">
+                      <button
+                        type="button"
+                        onClick={() => setImageExportType('png')}
+                        className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
+                          imageExportType === 'png'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                        }`}
+                      >
+                        PNG (Lossless)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setImageExportType('jpeg')}
+                        className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
+                          imageExportType === 'jpeg'
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                        }`}
+                      >
+                        JPEG (Compact)
+                      </button>
+                    </div>
+                  </div>
+
+                  {imageExportType === 'jpeg' && (
+                    <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-200 dark:border-slate-700">
+                      <span className="text-[11px] text-slate-600 dark:text-slate-400">JPEG Quality:</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min="0.6"
+                          max="1.0"
+                          step="0.05"
+                          value={imageExportQuality}
+                          onChange={(e) => setImageExportQuality(Number(e.target.value))}
+                          className="w-24 accent-blue-600 cursor-pointer"
+                        />
+                        <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 w-9 text-right">
+                          {Math.round(imageExportQuality * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Captures Page {currentPage} at full 2x canvas resolution including freehand drawings, stamps, and shapes.
+                  </p>
+                </div>
+              )}
+
+              {exportFormat === 'text' && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Export Structure:</span>
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-700 p-0.5 rounded-lg border border-slate-200 dark:border-slate-600">
+                      <button
+                        type="button"
+                        onClick={() => setTextExportFormat('txt')}
+                        className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
+                          textExportFormat === 'txt'
+                            ? 'bg-purple-600 text-white shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                        }`}
+                      >
+                        Plain Text (.TXT)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTextExportFormat('json')}
+                        className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
+                          textExportFormat === 'json'
+                            ? 'bg-purple-600 text-white shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
+                        }`}
+                      >
+                        Structured JSON
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {textExportFormat === 'txt'
+                      ? 'Extracts all editable page text, annotations, and OCR transcripts sequentially.'
+                      : 'Exports complete document JSON schema with element bounding boxes, font attributes, colors, and coordinates.'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isExporting}
+                onClick={() => {
+                  if (exportFormat === 'vector-pdf') {
+                    handleExportPdf(false);
+                  } else if (exportFormat === 'web-pdf') {
+                    handleExportPdf(true);
+                  } else if (exportFormat === 'image') {
+                    handleExportImage(imageExportType, imageExportQuality);
+                  } else if (exportFormat === 'text') {
+                    handleExportText(textExportFormat);
+                  }
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-md transition-colors cursor-pointer"
+              >
+                {isExporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                <span>
+                  {exportFormat === 'vector-pdf' && 'Download Vector PDF'}
+                  {exportFormat === 'web-pdf' && 'Download Web PDF'}
+                  {exportFormat === 'image' && `Download Page ${currentPage} (${imageExportType.toUpperCase()})`}
+                  {exportFormat === 'text' && `Download ${textExportFormat.toUpperCase()}`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. KEYBOARD SHORTCUTS & CANVAS INTERACTION MODAL */}
+      {isShortcutsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Keyboard className="w-5 h-5 text-violet-600" />
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">Canvas Shortcuts & Controls</h3>
+              </div>
+              <button
+                onClick={() => setIsShortcutsModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto pr-1">
+              <div>
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Element Manipulation</h4>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">Delete selected element</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border text-[11px] font-mono shadow-2xs">Delete / Backspace</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">Undo last action</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border text-[11px] font-mono shadow-2xs">Ctrl + Z / ⌘Z</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">Redo action</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border text-[11px] font-mono shadow-2xs">Ctrl + Y / ⇧⌘Z</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">Copy & Paste element</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border text-[11px] font-mono shadow-2xs">Ctrl+C / Ctrl+V</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">Nudge element 1px / 10px</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border text-[11px] font-mono shadow-2xs">Arrow Keys / ⇧ + Arrows</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">Clear selection / Cancel tool</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border text-[11px] font-mono shadow-2xs">Escape</kbd>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Transform, Draw & Highlight</h4>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">Straight line highlight/draw</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border text-[11px] font-mono shadow-2xs">Hold Shift + Drag</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">360° Object Rotation</span>
+                    <span className="text-slate-500 text-[11px]">Drag circular handle above element</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">Snap rotation to 15° angles</span>
+                    <kbd className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border text-[11px] font-mono shadow-2xs">Hold Shift + Rotate</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-700 dark:text-slate-300">8-Point Element Resizing</span>
+                    <span className="text-slate-500 text-[11px]">Drag any bounding box corner or edge</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsShortcutsModalOpen(false)}
+                className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Got It
               </button>
             </div>
           </div>
